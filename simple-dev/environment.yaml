@@ -1,0 +1,5 @@
+name: simple-dev
+displayName: Simple Dev Environment
+description: Minimal ADE definition
+version: 1.0.0
+type: bicep
