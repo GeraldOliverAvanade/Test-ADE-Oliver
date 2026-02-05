@@ -1,0 +1,13 @@
+name: simple-dev
+version: 1.0.0
+summary: Simple Dev Environment
+description: Minimal ADE definition
+runner: Bicep
+templatePath: main.bicep
+
+parameters:
+  - id: envName
+    name: Environment Name
+    description: Used as a prefix for deployed resources
+    type: string
+    required: true
