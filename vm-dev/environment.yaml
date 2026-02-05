@@ -1,4 +1,4 @@
-name: simple-dev
+name: vm-dev
 version: 1.0.0
 summary: Simple Dev Environment
 description: Minimal ADE definition (VNET)
