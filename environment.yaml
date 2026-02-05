@@ -1,6 +1,0 @@
-name: Test-ADE-Oliver
-version: 1.0.0
-summary: Simple test environment that deploys resources with ARM template
-description: Test environment for ADE using main.json
-runner: ARM
-templatePath: main.json
