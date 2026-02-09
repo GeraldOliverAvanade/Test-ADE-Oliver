@@ -49,4 +49,5 @@ resource vnetSubnets 'Microsoft.Network/virtualNetworks/subnets@2023-11-01' = [f
 
 output vnetId string = vnet.id
 output vnetNameOut string = vnet.name
-output subnetIds array = [for sn in vnetSubnets: sn.id]
+output subnetIds array = [for i in range(0, length(subnets)): vnetSubnets[i].id]
+output subnetNames array = [for i in range(0, length(subnets)): vnetSubnets[i].name]
