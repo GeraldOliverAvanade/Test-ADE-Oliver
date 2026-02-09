@@ -2,8 +2,8 @@ name: simple-dev
 version: 1.0.0
 summary: Simple Dev Environment
 description: Minimal ADE definition
-runner: Bicep
-templatePath: main.bicep
+runner: Terraform
+templatePath: main.tf
 
 parameters:
   - id: envName
