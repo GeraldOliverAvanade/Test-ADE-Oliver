@@ -1,37 +1,55 @@
 name: vm-dev
 version: 1.0.0
 summary: Simple Dev Environment
-description: Minimal ADE definition (VNET)
+description: Minimal ADE definition (VNet + Subnets)
 runner: Bicep
 templatePath: main.bicep
 
 parameters:
   - id: envName
     name: Environment Name
-    description: Used as a prefix for deployed resources
+    description: Prefix for resource names
     type: string
     required: true
+
+  - id: location
+    name: Location
+    description: Azure region (leave empty to use RG location)
+    type: string
+    required: false
 
   - id: vnetName
-    name: VNET Name
-    description: Name of the virtual network
+    name: VNet Name
+    description: Leave empty to auto-generate from envName
+    type: string
+    required: false
+
+  - id: vnetAddressSpace
+    name: VNet Address Space
+    description: e.g. 10.10.0.0/16
     type: string
     required: true
 
-  - id: vnetAddressPrefix
-    name: VNET Address Space
-    description: CIDR for VNET (example: 10.10.0.0/16)
-    type: string
+  - id: subnets
+    name: Subnets
+    description: Array of subnet objects (name, addressPrefix, optional nsgRules)
+    type: array
     required: true
 
-  - id: subnetName
-    name: Subnet Name
-    description: Name of the subnet
-    type: string
-    required: true
+  - id: dnsServers
+    name: DNS Servers
+    description: Optional custom DNS servers, e.g. ["10.0.0.4","10.0.0.5"]
+    type: array
+    required: false
 
-  - id: subnetAddressPrefix
-    name: Subnet Address Prefix
-    description: CIDR for subnet (example: 10.10.1.0/24)
-    type: string
-    required: true
+  - id: enableDdosProtection
+    name: Enable DDoS Protection
+    description: true/false (default false)
+    type: boolean
+    required: false
+
+  - id: tags
+    name: Tags
+    description: Optional tags object
+    type: object
+    required: false
