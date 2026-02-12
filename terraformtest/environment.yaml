@@ -2,7 +2,7 @@ name: WebApp
 version: 1.0.0
 summary: Azure Web App Environment
 description: Deploys a web app in Azure without a datastore
-runner: "<REGISTRY_NAME>.azurecr.io/<REPOSITORY_NAME>:<TAG>"
+runner: "acrtfoliver.azurecr.io/ade-terraform-runner:1.0.0"
 templatePath: azuredeploy.tf
 
 # 実行時に使用するパラメータ
