@@ -1,0 +1,14 @@
+{
+  "parameters": {
+    "resource_group_name": {
+      "type": "string",
+      "displayName": "Resource Group Name",
+      "description": "Name of the resource group to create"
+    },
+    "location": {
+      "type": "string",
+      "displayName": "Location",
+      "default": "japaneast"
+    }
+  }
+}
