@@ -1,7 +1,6 @@
 name: rg-terraform
-version: "1.0.0"
-summary: "Create a resource group (Terraform)"
-description: "Simple ADE environment that deploys 1 resource group."
-runner: terraform
-templatePath: "."
-parametersFile: "parameters.json"
+version: 1.0.0
+summary: Create a resource group (Terraform)
+description: Simple ADE environment that deploys 1 resource group.
+runner: Terraform
+templatePath: main.tf
