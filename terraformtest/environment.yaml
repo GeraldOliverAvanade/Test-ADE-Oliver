@@ -1,6 +1,14 @@
-name: rg-terraform
+name: WebApp
 version: 1.0.0
-summary: Create a resource group (Terraform)
-description: Simple ADE environment that deploys 1 resource group.
-runner: Terraform
-templatePath: main.tf
+summary: Azure Web App Environment
+description: Deploys a web app in Azure without a datastore
+runner: "<REGISTRY_NAME>.azurecr.io/<REPOSITORY_NAME>:<TAG>"
+templatePath: azuredeploy.tf
+
+# 実行時に使用するパラメータ
+parameters:
+  - id: db_password
+    name: db_password
+    description: 'The password for the database'
+    type: string
+    required: true
