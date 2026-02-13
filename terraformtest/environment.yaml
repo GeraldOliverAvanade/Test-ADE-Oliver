@@ -1,14 +1,17 @@
-name: WebApp
+name: RGOnly
 version: 1.0.0
-summary: Azure Web App Environment
-description: Deploys a web app in Azure without a datastore
+summary: Resource Group Environment
+description: Deploys a resource group only
 runner: "acrtfoliver.azurecr.io/ade-terraform-runner:1.0.0"
 templatePath: azuredeploy.tf
 
-# 実行時に使用するパラメータ
 parameters:
-  - id: db_password
-    name: db_password
-    description: 'The password for the database'
+  - id: resource_group_name
+    name: Resource Group Name
+    type: string
+    required: true
+
+  - id: location
+    name: Location
     type: string
     required: true
