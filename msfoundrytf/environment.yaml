@@ -1,0 +1,47 @@
+name: MSFoundry
+version: 1.0.0
+summary: MS Foundry (Azure AI Services) Environment
+description: Deploys Azure AI Services (Foundry) resource
+runner: "acrtfoliver.azurecr.io/ade-terraform-runner:1.0.0"
+templatePath: "."
+
+parameters:
+  - id: resource_group_name
+    name: Resource Group Name
+    type: string
+    required: true
+
+  - id: location
+    name: Location
+    type: string
+    required: true
+
+  - id: ai_services_name
+    name: AI Services Name
+    type: string
+    required: true
+
+  - id: custom_subdomain_name
+    name: Custom Subdomain Name
+    type: string
+    required: true
+
+  - id: sku_name
+    name: SKU Name
+    type: string
+    required: false
+
+  - id: public_network_access
+    name: Public Network Access (Enabled/Disabled)
+    type: string
+    required: false
+
+  - id: local_authentication_enabled
+    name: Local Authentication Enabled
+    type: boolean
+    required: false
+
+  - id: outbound_network_access_restricted
+    name: Outbound Network Access Restricted
+    type: boolean
+    required: false
