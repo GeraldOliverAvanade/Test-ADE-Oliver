@@ -47,18 +47,18 @@ variable "public_network_access" {
 }
 
 variable "local_authentication_enabled" {
-  type        = bool
-  default     = true
+  type    = bool
+  default = true
 }
 
 variable "outbound_network_access_restricted" {
-  type        = bool
-  default     = false
+  type    = bool
+  default = false
 }
 
 variable "tags" {
-  type        = map(string)
-  default     = {}
+  type    = map(string)
+  default = {}
 }
 
 # Network
@@ -108,21 +108,21 @@ resource "azurerm_subnet" "pe" {
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = var.pe_subnet_prefixes
 
+  # Your provider schema accepts this form
   private_endpoint_network_policies = "Disabled"
 }
-
 
 #################
 # Azure AI Services (Foundry)
 #################
 resource "azurerm_ai_services" "foundry" {
-  name                         = var.ai_services_name
-  location                     = azurerm_resource_group.rg.location
-  resource_group_name          = azurerm_resource_group.rg.name
-  sku_name                     = var.sku_name
-  custom_subdomain_name        = var.custom_subdomain_name
-  public_network_access        = var.public_network_access
-  local_authentication_enabled = var.local_authentication_enabled
+  name                              = var.ai_services_name
+  location                          = azurerm_resource_group.rg.location
+  resource_group_name               = azurerm_resource_group.rg.name
+  sku_name                          = var.sku_name
+  custom_subdomain_name             = var.custom_subdomain_name
+  public_network_access             = var.public_network_access
+  local_authentication_enabled      = var.local_authentication_enabled
   outbound_network_access_restricted = var.outbound_network_access_restricted
 
   identity {
@@ -165,6 +165,7 @@ resource "azurerm_private_endpoint" "ai_pe" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   subnet_id           = azurerm_subnet.pe.id
+  tags                = var.tags
 
   private_service_connection {
     name                           = "psc-${var.ai_services_name}"
@@ -173,33 +174,12 @@ resource "azurerm_private_endpoint" "ai_pe" {
     is_manual_connection           = false
   }
 
-
+  # DNS zone association (avoid azurerm_private_dns_zone_group resource)
   private_dns_zone_group {
     name                 = "ai-dns-zone-group"
     private_dns_zone_ids = [azurerm_private_dns_zone.ai.id]
   }
 }
-
-resource "azurerm_private_endpoint" "ai_pe" {
-  name                = "pe-${var.ai_services_name}"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  subnet_id           = azurerm_subnet.pe.id
-
-  private_service_connection {
-    name                           = "psc-${var.ai_services_name}"
-    private_connection_resource_id = azurerm_ai_services.foundry.id
-    subresource_names              = ["account"]
-    is_manual_connection           = false
-  }
-
-  # ✅ DNS zone association (instead of azurerm_private_dns_zone_group resource)
-  private_dns_zone_group {
-    name                 = "ai-dns-zone-group"
-    private_dns_zone_ids = [azurerm_private_dns_zone.ai.id]
-  }
-}
-
 
 #################
 # Outputs
