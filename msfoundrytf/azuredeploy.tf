@@ -61,15 +61,16 @@ variable "tags" {
   default = {}
 }
 
-# Network
+# Network inputs (ADE-friendly as strings)
 variable "vnet_name" {
   type    = string
   default = "vnet-foundry-ade"
 }
 
+# Accept comma-separated list in ADE, e.g. "10.10.0.0/16,10.11.0.0/16"
 variable "vnet_address_space" {
-  type    = list(string)
-  default = ["10.10.0.0/16"]
+  type    = string
+  default = "10.10.0.0/16"
 }
 
 variable "pe_subnet_name" {
@@ -77,9 +78,15 @@ variable "pe_subnet_name" {
   default = "snet-private-endpoints"
 }
 
+# Accept comma-separated list in ADE, e.g. "10.10.1.0/24"
 variable "pe_subnet_prefixes" {
-  type    = list(string)
-  default = ["10.10.1.0/24"]
+  type    = string
+  default = "10.10.1.0/24"
+}
+
+locals {
+  vnet_address_space_list = [for s in split(",", var.vnet_address_space) : trimspace(s)]
+  pe_subnet_prefixes_list = [for s in split(",", var.pe_subnet_prefixes) : trimspace(s)]
 }
 
 #################
@@ -98,7 +105,7 @@ resource "azurerm_virtual_network" "vnet" {
   name                = var.vnet_name
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  address_space       = var.vnet_address_space
+  address_space       = local.vnet_address_space_list
   tags                = var.tags
 }
 
@@ -106,9 +113,9 @@ resource "azurerm_subnet" "pe" {
   name                 = var.pe_subnet_name
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = var.pe_subnet_prefixes
+  address_prefixes     = local.pe_subnet_prefixes_list
 
-  # Your provider schema accepts this form
+  # Your runner accepted this schema previously
   private_endpoint_network_policies = "Disabled"
 }
 
@@ -116,20 +123,19 @@ resource "azurerm_subnet" "pe" {
 # Azure AI Services (Foundry)
 #################
 resource "azurerm_ai_services" "foundry" {
-  name                              = var.ai_services_name
-  location                          = azurerm_resource_group.rg.location
-  resource_group_name               = azurerm_resource_group.rg.name
-  sku_name                          = var.sku_name
-  custom_subdomain_name             = var.custom_subdomain_name
-  public_network_access             = var.public_network_access
-  local_authentication_enabled      = var.local_authentication_enabled
+  name                               = var.ai_services_name
+  location                           = azurerm_resource_group.rg.location
+  resource_group_name                = azurerm_resource_group.rg.name
+  sku_name                           = var.sku_name
+  custom_subdomain_name              = var.custom_subdomain_name
+  public_network_access              = var.public_network_access
+  local_authentication_enabled       = var.local_authentication_enabled
   outbound_network_access_restricted = var.outbound_network_access_restricted
 
   identity {
     type = "SystemAssigned"
   }
 
-  # Keep permissive ACLs; PE + DNS will handle private routing
   network_acls {
     default_action = "Allow"
     ip_rules       = []
@@ -158,7 +164,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "ai_link" {
 }
 
 #################
-# Private Endpoint + DNS Zone Group
+# Private Endpoint + DNS Zone Group (inline)
 #################
 resource "azurerm_private_endpoint" "ai_pe" {
   name                = "pe-${var.ai_services_name}"
@@ -174,7 +180,6 @@ resource "azurerm_private_endpoint" "ai_pe" {
     is_manual_connection           = false
   }
 
-  # DNS zone association (avoid azurerm_private_dns_zone_group resource)
   private_dns_zone_group {
     name                 = "ai-dns-zone-group"
     private_dns_zone_ids = [azurerm_private_dns_zone.ai.id]
