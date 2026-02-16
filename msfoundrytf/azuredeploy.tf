@@ -108,8 +108,9 @@ resource "azurerm_subnet" "pe" {
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = var.pe_subnet_prefixes
 
-  # Required for Private Endpoint subnet
-  private_endpoint_network_policies_enabled = false
+ # v3.x syntax (NOTE: true = disables policies)
+ enforce_private_link_endpoint_network_policies = true
+
 }
 
 #################
@@ -165,18 +166,21 @@ resource "azurerm_private_endpoint" "ai_pe" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   subnet_id           = azurerm_subnet.pe.id
-  tags                = var.tags
 
   private_service_connection {
     name                           = "psc-${var.ai_services_name}"
     private_connection_resource_id = azurerm_ai_services.foundry.id
+    subresource_names              = ["account"]
+    is_manual_connection           = false
+  }
 
-    # Common groupId for AI/Cognitive Services account
-    subresource_names = ["account"]
 
-    is_manual_connection = false
+  private_dns_zone_group {
+    name                 = "ai-dns-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.ai.id]
   }
 }
+
 
 resource "azurerm_private_dns_zone_group" "ai_zone_group" {
   name                = "zdg-${var.ai_services_name}"
