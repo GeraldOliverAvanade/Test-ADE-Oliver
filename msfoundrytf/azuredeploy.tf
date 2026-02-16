@@ -11,43 +11,110 @@ provider "azurerm" {
   features {}
 }
 
-variable "resource_group_name" { type = string }
-variable "location" { type = string }
+#################
+# Variables
+#################
+variable "resource_group_name" {
+  type        = string
+  description = "Resource group name"
+}
 
-variable "ai_services_name" { type = string }
-variable "custom_subdomain_name" { type = string }
+variable "location" {
+  type        = string
+  description = "Azure region (e.g. japaneast)"
+}
+
+variable "ai_services_name" {
+  type        = string
+  description = "Azure AI Services resource name"
+}
+
+variable "custom_subdomain_name" {
+  type        = string
+  description = "Globally unique custom subdomain name"
+}
 
 variable "sku_name" {
-  type    = string
-  default = "S0"
+  type        = string
+  description = "SKU (e.g. S0)"
+  default     = "S0"
 }
 
 variable "public_network_access" {
-  type    = string
-  default = "Enabled"
+  type        = string
+  description = "Enabled or Disabled"
+  default     = "Disabled"
 }
 
 variable "local_authentication_enabled" {
-  type    = bool
-  default = true
+  type        = bool
+  default     = true
 }
 
 variable "outbound_network_access_restricted" {
-  type    = bool
-  default = false
+  type        = bool
+  default     = false
 }
 
 variable "tags" {
-  type    = map(string)
-  default = {}
+  type        = map(string)
+  default     = {}
 }
 
-# ✅ Create RG first
+# Network
+variable "vnet_name" {
+  type    = string
+  default = "vnet-foundry-ade"
+}
+
+variable "vnet_address_space" {
+  type    = list(string)
+  default = ["10.10.0.0/16"]
+}
+
+variable "pe_subnet_name" {
+  type    = string
+  default = "snet-private-endpoints"
+}
+
+variable "pe_subnet_prefixes" {
+  type    = list(string)
+  default = ["10.10.1.0/24"]
+}
+
+#################
+# Resource Group
+#################
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = var.location
+  tags     = var.tags
 }
 
+#################
+# VNet + Subnet (for Private Endpoint)
+#################
+resource "azurerm_virtual_network" "vnet" {
+  name                = var.vnet_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  address_space       = var.vnet_address_space
+  tags                = var.tags
+}
+
+resource "azurerm_subnet" "pe" {
+  name                 = var.pe_subnet_name
+  resource_group_name  = azurerm_resource_group.rg.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = var.pe_subnet_prefixes
+
+  # Required for Private Endpoint subnet
+  private_endpoint_network_policies_enabled = false
+}
+
+#################
+# Azure AI Services (Foundry)
+#################
 resource "azurerm_ai_services" "foundry" {
   name                         = var.ai_services_name
   location                     = azurerm_resource_group.rg.location
@@ -62,6 +129,7 @@ resource "azurerm_ai_services" "foundry" {
     type = "SystemAssigned"
   }
 
+  # Keep permissive ACLs; PE + DNS will handle private routing
   network_acls {
     default_action = "Allow"
     ip_rules       = []
@@ -71,5 +139,74 @@ resource "azurerm_ai_services" "foundry" {
   tags = var.tags
 }
 
-output "resource_group_name" { value = azurerm_resource_group.rg.name }
-output "ai_services_id"      { value = azurerm_ai_services.foundry.id }
+#################
+# Private DNS (Cognitive Services / AI Services)
+#################
+resource "azurerm_private_dns_zone" "ai" {
+  name                = "privatelink.cognitiveservices.azure.com"
+  resource_group_name = azurerm_resource_group.rg.name
+  tags                = var.tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "ai_link" {
+  name                  = "link-${var.vnet_name}"
+  resource_group_name   = azurerm_resource_group.rg.name
+  private_dns_zone_name = azurerm_private_dns_zone.ai.name
+  virtual_network_id    = azurerm_virtual_network.vnet.id
+  registration_enabled  = false
+  tags                  = var.tags
+}
+
+#################
+# Private Endpoint + DNS Zone Group
+#################
+resource "azurerm_private_endpoint" "ai_pe" {
+  name                = "pe-${var.ai_services_name}"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  subnet_id           = azurerm_subnet.pe.id
+  tags                = var.tags
+
+  private_service_connection {
+    name                           = "psc-${var.ai_services_name}"
+    private_connection_resource_id = azurerm_ai_services.foundry.id
+
+    # Common groupId for AI/Cognitive Services account
+    subresource_names = ["account"]
+
+    is_manual_connection = false
+  }
+}
+
+resource "azurerm_private_dns_zone_group" "ai_zone_group" {
+  name                = "zdg-${var.ai_services_name}"
+  private_endpoint_id = azurerm_private_endpoint.ai_pe.id
+
+  private_dns_zone_configs {
+    name                = "ai"
+    private_dns_zone_id = azurerm_private_dns_zone.ai.id
+  }
+}
+
+#################
+# Outputs
+#################
+output "resource_group_name" {
+  value = azurerm_resource_group.rg.name
+}
+
+output "vnet_id" {
+  value = azurerm_virtual_network.vnet.id
+}
+
+output "ai_services_id" {
+  value = azurerm_ai_services.foundry.id
+}
+
+output "private_endpoint_id" {
+  value = azurerm_private_endpoint.ai_pe.id
+}
+
+output "private_dns_zone_name" {
+  value = azurerm_private_dns_zone.ai.name
+}
