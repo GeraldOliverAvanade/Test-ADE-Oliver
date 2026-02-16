@@ -1,7 +1,7 @@
-name: MSFoundry
+name: MSFoundryPrivate
 version: 1.0.0
-summary: MS Foundry (Azure AI Services) Environment
-description: Deploys Azure AI Services (Foundry) resource
+summary: MS Foundry with VNet + Private Endpoint
+description: Deploys Azure AI Services with VNet, Private Endpoint and Private DNS
 runner: "acrtfoliver.azurecr.io/ade-terraform-runner:1.0.0"
 templatePath: "."
 
@@ -32,7 +32,7 @@ parameters:
     required: false
 
   - id: public_network_access
-    name: Public Network Access (Enabled/Disabled)
+    name: Public Network Access
     type: string
     required: false
 
