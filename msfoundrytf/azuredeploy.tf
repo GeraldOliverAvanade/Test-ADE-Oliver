@@ -164,6 +164,27 @@ resource "azurerm_private_dns_zone_virtual_network_link" "ai_link" {
 }
 
 #################
+# Private DNS (OpenAi)
+#################
+
+# Private DNS (Azure OpenAI)
+resource "azurerm_private_dns_zone" "openai" {
+  name                = "privatelink.openai.azure.com"
+  resource_group_name = azurerm_resource_group.rg.name
+  tags                = var.tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "openai_link" {
+  name                  = "link-openai-${var.vnet_name}"
+  resource_group_name   = azurerm_resource_group.rg.name
+  private_dns_zone_name = azurerm_private_dns_zone.openai.name
+  virtual_network_id    = azurerm_virtual_network.vnet.id
+  registration_enabled  = false
+  tags                  = var.tags
+}
+
+
+#################
 # Private Endpoint + DNS Zone Group (inline)
 #################
 resource "azurerm_private_endpoint" "ai_pe" {
@@ -182,7 +203,7 @@ resource "azurerm_private_endpoint" "ai_pe" {
 
   private_dns_zone_group {
     name                 = "ai-dns-zone-group"
-    private_dns_zone_ids = [azurerm_private_dns_zone.ai.id]
+    private_dns_zone_ids = [azurerm_private_dns_zone.ai.id,azurerm_private_dns_zone.openai.id]
   }
 }
 
