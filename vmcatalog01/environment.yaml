@@ -1,7 +1,7 @@
-name: ADECatalog01
-version: 1.1.0
-summary: VM (Windows/Linux) + VNet/Subnets + NSG + Bastion (Terraform)
-description: Deploys RG, VNet, VM subnet, AzureBastionSubnet, NSG, VM, optional VM Public IP, and Bastion.
+name: ADEVmVnetNsgBastion
+version: 1.0.0
+summary: Windows VM with VNet/Subnets, NSG, and Bastion (Terraform)
+description: Deploys a Resource Group, VNet, VM subnet, AzureBastionSubnet, NSG (RDP from Bastion only), Windows VM, and Bastion host.
 runner: "acrtfoliver.azurecr.io/ade-terraform-runner:1.0.0"
 templatePath: "."
 
@@ -16,58 +16,13 @@ parameters:
     type: string
     required: true
 
-  - id: os_type
-    name: OS Type (windows/linux)
-    type: string
-    required: true
-
-  - id: vm_name
-    name: VM Name
-    type: string
-    required: true
-
-  - id: vm_size
-    name: VM Size / SKU
-    type: string
-    required: true
-
-  - id: os_disk_size_gb
-    name: OS Disk Size (GB)
-    type: integer
-    required: false
-
-  - id: admin_username
-    name: Admin Username
-    type: string
-    required: true
-
   - id: admin_password
-    name: Admin Password (Windows only)
+    name: Admin Password
     type: string
-    required: false
+    required: true
 
-  - id: ssh_public_key
-    name: SSH Public Key (Linux only)
-    type: string
-    required: false
-
-  - id: enable_vm_public_ip
-    name: Enable VM Public IP
-    type: boolean
-    required: false
-
-  - id: zone
-    name: Zone (e.g. "1", or empty)
-    type: string
-    required: false
-
-  - id: enable_auto_shutdown
-    name: Enable Auto Shutdown (Windows only)
-    type: boolean
-    required: false
-
-  - id: auto_shutdown_time_utc
-    name: Auto Shutdown Time (UTC HHmm)
+  - id: tags
+    name: Tags (JSON map)
     type: string
     required: false
 
@@ -93,5 +48,40 @@ parameters:
 
   - id: bastion_subnet_prefixes
     name: Bastion Subnet Prefixes (comma-separated)
+    type: string
+    required: false
+
+  - id: vm_name
+    name: VM Name
+    type: string
+    required: false
+
+  - id: vm_computer_name
+    name: VM Computer Name
+    type: string
+    required: false
+
+  - id: vm_size
+    name: VM Size
+    type: string
+    required: false
+
+  - id: admin_username
+    name: Admin Username
+    type: string
+    required: false
+
+  - id: zone
+    name: Zone (e.g. "1", or empty)
+    type: string
+    required: false
+
+  - id: enable_auto_shutdown
+    name: Enable Auto Shutdown
+    type: boolean
+    required: false
+
+  - id: auto_shutdown_time_utc
+    name: Auto Shutdown Time (UTC, HHmm e.g. 1900)
     type: string
     required: false
