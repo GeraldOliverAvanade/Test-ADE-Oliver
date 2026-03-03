@@ -1,4 +1,4 @@
-name: ADECatalog01
+name: ADEVmVnetNsgBastion
 version: 1.1.0
 summary: VM (Windows/Linux) + VNet/Subnets + NSG + Bastion (Terraform)
 description: Deploys RG, VNet, VM subnet, AzureBastionSubnet, NSG, VM, optional VM Public IP, and Bastion.
