@@ -65,11 +65,6 @@ variable "vm_name" {
   default = "vm-test-oliver-01"
 }
 
-variable "vm_computer_name" {
-  type    = string
-  default = "vm-test-oliver-01"
-}
-
 variable "vm_size" {
   type    = string
   default = "Standard_E2s_v3"
@@ -84,6 +79,49 @@ variable "admin_password" {
   type        = string
   sensitive   = true
   description = "Windows admin password"
+}
+
+# VM OS Disk
+variable "os_disk_size_gb" {
+  type        = number
+  description = "OS disk size in GB"
+  default     = 127
+}
+
+# VM Public IP (for direct access). Bastion still has its own public IP regardless.
+variable "enable_vm_public_ip" {
+  type        = bool
+  description = "Attach a Public IP to the VM NIC"
+  default     = false
+}
+
+# Optional: allow RDP from these CIDRs if VM has public IP enabled
+# Comma-separated list, e.g. "203.0.113.10/32,203.0.113.11/32"
+variable "rdp_source_prefixes" {
+  type        = string
+  description = "Comma-separated CIDRs allowed to RDP when enable_vm_public_ip=true"
+  default     = ""
+}
+
+# OS Image (user-definable)
+variable "image_publisher" {
+  type    = string
+  default = "MicrosoftWindowsServer"
+}
+
+variable "image_offer" {
+  type    = string
+  default = "WindowsServer"
+}
+
+variable "image_sku" {
+  type    = string
+  default = "2025-datacenter-azure-edition"
+}
+
+variable "image_version" {
+  type    = string
+  default = "latest"
 }
 
 variable "zone" {
@@ -105,12 +143,16 @@ variable "auto_shutdown_time_utc" {
 }
 
 locals {
-  vnet_address_space_list   = [for s in split(",", var.vnet_address_space) : trimspace(s)]
-  vm_subnet_prefixes_list   = [for s in split(",", var.vm_subnet_prefixes) : trimspace(s)]
+  vnet_address_space_list      = [for s in split(",", var.vnet_address_space) : trimspace(s)]
+  vm_subnet_prefixes_list      = [for s in split(",", var.vm_subnet_prefixes) : trimspace(s)]
   bastion_subnet_prefixes_list = [for s in split(",", var.bastion_subnet_prefixes) : trimspace(s)]
+  rdp_source_prefixes_list     = [for s in split(",", var.rdp_source_prefixes) : trimspace(s) if trimspace(s) != ""]
 
   # Convert zone to list for resources that accept list. If empty, use null/empty.
   zone_list = (trimspace(var.zone) == "" ? [] : [trimspace(var.zone)])
+
+  # Windows computer_name has a 15-char limit. Derive it from vm_name safely.
+  computer_name = substr(replace(var.vm_name, "_", "-"), 0, 15)
 }
 
 #################
@@ -152,7 +194,9 @@ resource "azurerm_subnet" "bastion" {
 }
 
 #################
-# NSG (allow RDP only from Bastion subnet)
+# NSG
+# - Always allow RDP only from Bastion subnet
+# - Optionally allow RDP from user CIDRs if VM has public IP enabled
 #################
 resource "azurerm_network_security_group" "vm_nsg" {
   name                = "${var.vm_name}-nsg"
@@ -172,10 +216,41 @@ resource "azurerm_network_security_group" "vm_nsg" {
     destination_address_prefix = "*"
     description                = "Allow RDP from AzureBastionSubnet only"
   }
+
+  dynamic "security_rule" {
+    for_each = (var.enable_vm_public_ip && length(local.rdp_source_prefixes_list) > 0) ? local.rdp_source_prefixes_list : []
+    content {
+      name                       = "Allow-RDP-From-${replace(replace(security_rule.value, "/", "-"), ".", "-")}"
+      priority                   = 400 + index(local.rdp_source_prefixes_list, security_rule.value)
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_port_range          = "*"
+      destination_port_range     = "3389"
+      source_address_prefix      = security_rule.value
+      destination_address_prefix = "*"
+      description                = "Allow RDP from specified source when VM Public IP is enabled"
+    }
+  }
 }
 
 #################
-# NIC (no Public IP - access via Bastion)
+# VM Public IP (optional)
+#################
+resource "azurerm_public_ip" "vm_pip" {
+  count               = var.enable_vm_public_ip ? 1 : 0
+  name                = "${var.vm_name}-pip"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  allocation_method = "Static"
+  sku              = "Standard"
+
+  tags = var.tags
+}
+
+#################
+# NIC (Public IP optional)
 #################
 resource "azurerm_network_interface" "nic" {
   name                = "${var.vm_name}-nic"
@@ -188,6 +263,7 @@ resource "azurerm_network_interface" "nic" {
     primary                       = true
     subnet_id                     = azurerm_subnet.vm.id
     private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = var.enable_vm_public_ip ? azurerm_public_ip.vm_pip[0].id : null
   }
 }
 
@@ -201,7 +277,7 @@ resource "azurerm_network_interface_security_group_association" "nic_nsg" {
 #################
 resource "azurerm_windows_virtual_machine" "vm" {
   name                = var.vm_name
-  computer_name       = var.vm_computer_name
+  computer_name       = local.computer_name
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   size                = var.vm_size
@@ -210,23 +286,23 @@ resource "azurerm_windows_virtual_machine" "vm" {
 
   network_interface_ids = [azurerm_network_interface.nic.id]
 
-  provision_vm_agent        = true
+  provision_vm_agent         = true
   allow_extension_operations = true
-  enable_automatic_updates  = true
-  patch_mode                = "AutomaticByPlatform"
-  patch_assessment_mode     = "ImageDefault"
+  enable_automatic_updates   = true
+  patch_mode                 = "AutomaticByPlatform"
+  patch_assessment_mode      = "ImageDefault"
 
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = "Premium_LRS"
-    disk_size_gb         = 127
+    disk_size_gb         = var.os_disk_size_gb
   }
 
   source_image_reference {
-    publisher = "MicrosoftWindowsServer"
-    offer     = "WindowsServer"
-    sku       = "2025-datacenter-azure-edition"
-    version   = "latest"
+    publisher = var.image_publisher
+    offer     = var.image_offer
+    sku       = var.image_sku
+    version   = var.image_version
   }
 
   # Optional zone
@@ -266,9 +342,7 @@ resource "azurerm_public_ip" "bastion_pip" {
 
   allocation_method = "Static"
   sku              = "Standard"
-
-  # Bastion Standard supports zones; keep it aligned with your VM zone usage
-  zones = local.zone_list
+  zones            = local.zone_list
 
   tags = var.tags
 }
@@ -304,6 +378,11 @@ output "vnet_id" {
 
 output "vm_id" {
   value = azurerm_windows_virtual_machine.vm.id
+}
+
+output "vm_public_ip" {
+  value       = var.enable_vm_public_ip ? azurerm_public_ip.vm_pip[0].ip_address : null
+  description = "VM Public IP (only if enabled)"
 }
 
 output "bastion_id" {
