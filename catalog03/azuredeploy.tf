@@ -211,6 +211,32 @@ variable "bastion_sku" {
 }
 
 #################
+# Storage Account (optional)  ✅ NEW
+#################
+variable "enable_storage_account" {
+  type    = bool
+  default = true
+}
+
+variable "storage_account_name" {
+  type        = string
+  description = "Storage Account name (3-24 lowercase letters/numbers). Leave empty to auto-generate."
+  default     = ""
+}
+
+variable "storage_account_tier" {
+  type        = string
+  description = "Standard or Premium"
+  default     = "Standard"
+}
+
+variable "storage_account_replication_type" {
+  type        = string
+  description = "LRS, GRS, RAGRS, ZRS"
+  default     = "LRS"
+}
+
+#################
 # Locals / Data
 #################
 data "azurerm_client_config" "current" {}
@@ -232,6 +258,9 @@ locals {
 
   # RSV: allow dash, max 50
   rsv_name = (trimspace(var.recovery_services_vault_name) != "" ? var.recovery_services_vault_name : "rsv-${substr(md5(var.resource_group_name), 0, 16)}")
+
+  # Storage Account: 3-24, lowercase letters/numbers only
+  sa_name  = (trimspace(var.storage_account_name) != "" ? lower(var.storage_account_name) : "st${substr(md5(var.resource_group_name), 0, 20)}")
 }
 
 #################
@@ -288,6 +317,24 @@ resource "azurerm_recovery_services_vault" "rsv" {
   sku                 = "Standard"
 
   soft_delete_enabled = true
+
+  tags = var.tags
+}
+
+#################
+# Storage Account (optional) ✅ NEW
+#################
+resource "azurerm_storage_account" "sa" {
+  count               = var.enable_storage_account ? 1 : 0
+  name                = local.sa_name
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+
+  account_tier             = var.storage_account_tier
+  account_replication_type = var.storage_account_replication_type
+
+  min_tls_version                   = "TLS1_2"
+  allow_nested_items_to_be_public   = false
 
   tags = var.tags
 }
@@ -509,8 +556,8 @@ resource "azurerm_bastion_host" "bastion" {
   sku = var.bastion_sku
 
   # Standard-only settings; set null for Basic
-  scale_units         = (var.bastion_sku == "Standard" ? 2 : null)
-  copy_paste_enabled  = (var.bastion_sku == "Standard" ? true : null)
+  scale_units        = (var.bastion_sku == "Standard" ? 2 : null)
+  copy_paste_enabled = (var.bastion_sku == "Standard" ? true : null)
 
   ip_configuration {
     name                 = "IpConf"
@@ -558,4 +605,15 @@ output "log_analytics_workspace_id" {
 output "recovery_services_vault_id" {
   value       = var.enable_recovery_services_vault ? azurerm_recovery_services_vault.rsv[0].id : null
   description = "Recovery Services Vault ID (if enabled)"
+}
+
+# Storage outputs ✅ NEW
+output "storage_account_id" {
+  value       = var.enable_storage_account ? azurerm_storage_account.sa[0].id : null
+  description = "Storage Account ID (if enabled)"
+}
+
+output "storage_account_name" {
+  value       = var.enable_storage_account ? azurerm_storage_account.sa[0].name : null
+  description = "Storage Account Name (if enabled)"
 }
