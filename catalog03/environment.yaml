@@ -1,7 +1,7 @@
 name: ADEVmVnetNsgBastion
 version: 1.0.0
-summary: Windows VM with VNet/Subnets, NSG, Bastion + KV + Log Analytics + RSV (Terraform)
-description: Deploys Resource Group, VNet/Subnets, NSG, Windows VM (optional Public IP), Bastion (Basic/Standard), optional Key Vault, Log Analytics, and Recovery Services Vault (+ optional VM backup).
+summary: Windows VM with VNet/Subnets, NSG, Bastion + KV + Log Analytics + RSV + Storage (Terraform)
+description: Deploys Resource Group, VNet/Subnets, NSG, Windows VM (optional Public IP), Bastion (Basic/Standard), optional Key Vault, Log Analytics, Recovery Services Vault (+ optional VM backup), and optional Storage Account.
 runner: "acrtfolivers.azurecr.io/ade-terraform-runner:1.0.0"
 templatePath: "."
 
@@ -169,4 +169,25 @@ parameters:
   - id: enable_vm_backup
     name: Enable VM Backup (to Recovery Services Vault)
     type: boolean
+    required: false
+
+  # Storage Account ✅ NEW
+  - id: enable_storage_account
+    name: Enable Storage Account
+    type: boolean
+    required: false
+
+  - id: storage_account_name
+    name: Storage Account Name (optional)
+    type: string
+    required: false
+
+  - id: storage_account_tier
+    name: Storage Account Tier (Standard/Premium)
+    type: string
+    required: false
+
+  - id: storage_account_replication_type
+    name: Storage Replication (LRS/GRS/ZRS/RAGRS)
+    type: string
     required: false
