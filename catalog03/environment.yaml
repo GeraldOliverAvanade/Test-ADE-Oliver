@@ -1,7 +1,7 @@
 name: ADEVmVnetNsgBastion
 version: 1.0.0
-summary: Windows VM with VNet/Subnets, NSG, and Bastion (Terraform)
-description: Deploys a Resource Group, VNet, VM subnet, AzureBastionSubnet, NSG, Windows VM (optional Public IP), and Bastion host.
+summary: Windows VM with VNet/Subnets, NSG, Bastion + KV + Log Analytics + RSV (Terraform)
+description: Deploys Resource Group, VNet/Subnets, NSG, Windows VM (optional Public IP), Bastion (Basic/Standard), optional Key Vault, Log Analytics, and Recovery Services Vault (+ optional VM backup).
 runner: "acrtfolivers.azurecr.io/ade-terraform-runner:1.0.0"
 templatePath: "."
 
@@ -114,4 +114,59 @@ parameters:
   - id: auto_shutdown_time_utc
     name: Auto Shutdown Time (UTC, HHmm e.g. 1900)
     type: string
+    required: false
+
+  - id: bastion_sku
+    name: Bastion SKU (Basic/Standard)
+    type: string
+    required: false
+
+  - id: enable_key_vault
+    name: Enable Key Vault
+    type: boolean
+    required: false
+
+  - id: key_vault_name
+    name: Key Vault Name (optional)
+    type: string
+    required: false
+
+  - id: key_vault_sku
+    name: Key Vault SKU (standard/premium)
+    type: string
+    required: false
+
+  - id: key_vault_rbac_enabled
+    name: Key Vault RBAC Enabled
+    type: boolean
+    required: false
+
+  - id: enable_log_analytics
+    name: Enable Log Analytics
+    type: boolean
+    required: false
+
+  - id: log_analytics_name
+    name: Log Analytics Workspace Name (optional)
+    type: string
+    required: false
+
+  - id: log_analytics_retention_days
+    name: Log Analytics Retention Days
+    type: number
+    required: false
+
+  - id: enable_recovery_services_vault
+    name: Enable Recovery Services Vault
+    type: boolean
+    required: false
+
+  - id: recovery_services_vault_name
+    name: Recovery Services Vault Name (optional)
+    type: string
+    required: false
+
+  - id: enable_vm_backup
+    name: Enable VM Backup (to Recovery Services Vault)
+    type: boolean
     required: false
