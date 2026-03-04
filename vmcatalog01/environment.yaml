@@ -2,7 +2,7 @@ name: ADEVmVnetNsgBastion
 version: 1.0.0
 summary: Windows VM with VNet/Subnets, NSG, and Bastion (Terraform)
 description: Deploys a Resource Group, VNet, VM subnet, AzureBastionSubnet, NSG, Windows VM (optional Public IP), and Bastion host.
-runner: "acrtfoliver.azurecr.io/ade-terraform-runner:1.0.0"
+runner: "acrtfolivers.azurecr.io/ade-terraform-runner:1.0.0"
 templatePath: "."
 
 parameters:
