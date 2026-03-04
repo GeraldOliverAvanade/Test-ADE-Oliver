@@ -1,0 +1,117 @@
+name: ADEVmVnetNsgBastion
+version: 1.0.0
+summary: Windows VM with VNet/Subnets, NSG, and Bastion (Terraform)
+description: Deploys a Resource Group, VNet, VM subnet, AzureBastionSubnet, NSG, Windows VM (optional Public IP), and Bastion host.
+runner: "acrtfolivers.azurecr.io/ade-terraform-runner:1.0.0"
+templatePath: "."
+
+parameters:
+  - id: resource_group_name
+    name: Resource Group Name
+    type: string
+    required: true
+
+  - id: location
+    name: Location
+    type: string
+    required: true
+
+  - id: admin_password
+    name: Admin Password
+    type: string
+    required: true
+
+  - id: tags
+    name: Tags (JSON map)
+    type: string
+    required: false
+
+  - id: vnet_name
+    name: VNet Name
+    type: string
+    required: false
+
+  - id: vnet_address_space
+    name: VNet Address Space (comma-separated)
+    type: string
+    required: false
+
+  - id: vm_subnet_name
+    name: VM Subnet Name
+    type: string
+    required: false
+
+  - id: vm_subnet_prefixes
+    name: VM Subnet Prefixes (comma-separated)
+    type: string
+    required: false
+
+  - id: bastion_subnet_prefixes
+    name: Bastion Subnet Prefixes (comma-separated)
+    type: string
+    required: false
+
+  - id: vm_name
+    name: VM Name
+    type: string
+    required: false
+
+  - id: vm_size
+    name: VM Size (SKU)
+    type: string
+    required: false
+
+  - id: admin_username
+    name: Admin Username
+    type: string
+    required: false
+
+  - id: os_disk_size_gb
+    name: OS Disk Size (GB)
+    type: number
+    required: false
+
+  - id: enable_vm_public_ip
+    name: Enable VM Public IP
+    type: boolean
+    required: false
+
+  - id: rdp_source_prefixes
+    name: RDP Allowed Source CIDRs (comma-separated, only if Public IP enabled)
+    type: string
+    required: false
+
+  - id: image_publisher
+    name: Image Publisher
+    type: string
+    required: false
+
+  - id: image_offer
+    name: Image Offer
+    type: string
+    required: false
+
+  - id: image_sku
+    name: Image SKU
+    type: string
+    required: false
+
+  - id: image_version
+    name: Image Version
+    type: string
+    required: false
+
+  - id: zone
+    name: Zone (e.g. "1", or empty)
+    type: string
+    required: false
+
+  - id: enable_auto_shutdown
+    name: Enable Auto Shutdown
+    type: boolean
+    required: false
+
+  - id: auto_shutdown_time_utc
+    name: Auto Shutdown Time (UTC, HHmm e.g. 1900)
+    type: string
+    required: false
