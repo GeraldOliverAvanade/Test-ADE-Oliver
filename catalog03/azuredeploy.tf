@@ -142,17 +142,96 @@ variable "auto_shutdown_time_utc" {
   default = "1900"
 }
 
+#################
+# Optional Services
+#################
+
+# Key Vault
+variable "enable_key_vault" {
+  type    = bool
+  default = true
+}
+
+variable "key_vault_name" {
+  type        = string
+  description = "Key Vault name (3-24 chars, alphanumeric). Leave empty to auto-generate."
+  default     = ""
+}
+
+variable "key_vault_sku" {
+  type        = string
+  description = "standard or premium"
+  default     = "standard"
+}
+
+variable "key_vault_rbac_enabled" {
+  type    = bool
+  default = true
+}
+
+# Log Analytics
+variable "enable_log_analytics" {
+  type    = bool
+  default = true
+}
+
+variable "log_analytics_name" {
+  type        = string
+  description = "Log Analytics Workspace name. Leave empty to auto-generate."
+  default     = ""
+}
+
+variable "log_analytics_retention_days" {
+  type    = number
+  default = 30
+}
+
+# Recovery Services Vault (RSC)
+variable "enable_recovery_services_vault" {
+  type    = bool
+  default = true
+}
+
+variable "recovery_services_vault_name" {
+  type        = string
+  description = "Recovery Services Vault name. Leave empty to auto-generate."
+  default     = ""
+}
+
+variable "enable_vm_backup" {
+  type    = bool
+  default = false
+}
+
+# Bastion SKU
+variable "bastion_sku" {
+  type        = string
+  description = "Bastion SKU: Basic or Standard"
+  default     = "Basic"
+}
+
+#################
+# Locals / Data
+#################
+data "azurerm_client_config" "current" {}
+
 locals {
   vnet_address_space_list      = [for s in split(",", var.vnet_address_space) : trimspace(s)]
   vm_subnet_prefixes_list      = [for s in split(",", var.vm_subnet_prefixes) : trimspace(s)]
   bastion_subnet_prefixes_list = [for s in split(",", var.bastion_subnet_prefixes) : trimspace(s)]
   rdp_source_prefixes_list     = [for s in split(",", var.rdp_source_prefixes) : trimspace(s) if trimspace(s) != ""]
 
-  # Convert zone to list for resources that accept list. If empty, use null/empty.
   zone_list = (trimspace(var.zone) == "" ? [] : [trimspace(var.zone)])
 
-  # Windows computer_name has a 15-char limit. Derive it from vm_name safely.
-  computer_name = substr(replace(var.vm_name, "_", "-"), 0, 15)
+  # Safe defaults (avoid global name collisions + KV rules)
+  # Key Vault: 3-24, alphanumeric only. ("kv" + 22 hex chars = 24)
+  kv_name  = (trimspace(var.key_vault_name) != "" ? lower(var.key_vault_name) : "kv${substr(md5(var.resource_group_name), 0, 22)}")
+
+  # Log Analytics: 4-63, letters/numbers/-; keep it simple as alnum
+  law_name = (trimspace(var.log_analytics_name) != "" ? lower(var.log_analytics_name) : "law${substr(md5(var.resource_group_name), 0, 20)}")
+
+  # RSV: allow dash, max 50
+  rsv_name = (trimspace(var.recovery_services_vault_name) != "" ? var.recovery_services_vault_name : "rsv-${substr(md5(var.resource_group_name), 0, 16)}")
 }
 
 #################
@@ -162,6 +241,55 @@ resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = var.location
   tags     = var.tags
+}
+
+#################
+# Key Vault (optional)
+#################
+resource "azurerm_key_vault" "kv" {
+  count               = var.enable_key_vault ? 1 : 0
+  name                = local.kv_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  tenant_id = data.azurerm_client_config.current.tenant_id
+  sku_name  = var.key_vault_sku
+
+  enable_rbac_authorization  = var.key_vault_rbac_enabled
+  soft_delete_retention_days = 7
+  purge_protection_enabled   = false
+
+  tags = var.tags
+}
+
+#################
+# Log Analytics (optional)
+#################
+resource "azurerm_log_analytics_workspace" "law" {
+  count               = var.enable_log_analytics ? 1 : 0
+  name                = local.law_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  sku               = "PerGB2018"
+  retention_in_days = var.log_analytics_retention_days
+
+  tags = var.tags
+}
+
+#################
+# Recovery Services Vault (optional)
+#################
+resource "azurerm_recovery_services_vault" "rsv" {
+  count               = var.enable_recovery_services_vault ? 1 : 0
+  name                = local.rsv_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  sku                 = "Standard"
+
+  soft_delete_enabled = true
+
+  tags = var.tags
 }
 
 #################
@@ -195,8 +323,6 @@ resource "azurerm_subnet" "bastion" {
 
 #################
 # NSG
-# - Always allow RDP only from Bastion subnet
-# - Optionally allow RDP from user CIDRs if VM has public IP enabled
 #################
 resource "azurerm_network_security_group" "vm_nsg" {
   name                = "${var.vm_name}-nsg"
@@ -250,7 +376,7 @@ resource "azurerm_public_ip" "vm_pip" {
 }
 
 #################
-# NIC (Public IP optional)
+# NIC
 #################
 resource "azurerm_network_interface" "nic" {
   name                = "${var.vm_name}-nic"
@@ -305,10 +431,36 @@ resource "azurerm_windows_virtual_machine" "vm" {
     version   = var.image_version
   }
 
-  # Optional zone
   zone = (trimspace(var.zone) == "" ? null : trimspace(var.zone))
 
   tags = var.tags
+}
+
+#################
+# VM Backup (optional)
+#################
+resource "azurerm_backup_policy_vm" "vm_policy" {
+  count               = (var.enable_recovery_services_vault && var.enable_vm_backup) ? 1 : 0
+  name                = "vm-daily-policy"
+  resource_group_name = azurerm_resource_group.rg.name
+  recovery_vault_name = azurerm_recovery_services_vault.rsv[0].name
+
+  backup {
+    frequency = "Daily"
+    time      = "23:00"
+  }
+
+  retention_daily {
+    count = 7
+  }
+}
+
+resource "azurerm_backup_protected_vm" "vm_backup" {
+  count               = (var.enable_recovery_services_vault && var.enable_vm_backup) ? 1 : 0
+  resource_group_name = azurerm_resource_group.rg.name
+  recovery_vault_name = azurerm_recovery_services_vault.rsv[0].name
+  source_vm_id        = azurerm_windows_virtual_machine.vm.id
+  backup_policy_id    = azurerm_backup_policy_vm.vm_policy[0].id
 }
 
 #################
@@ -342,7 +494,9 @@ resource "azurerm_public_ip" "bastion_pip" {
 
   allocation_method = "Static"
   sku              = "Standard"
-  zones            = local.zone_list
+
+  # Zones mainly used with Standard Bastion; keep null for Basic to avoid mismatch headaches
+  zones = (var.bastion_sku == "Standard" ? local.zone_list : null)
 
   tags = var.tags
 }
@@ -351,10 +505,12 @@ resource "azurerm_bastion_host" "bastion" {
   name                = "${var.vnet_name}-bastion"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  sku                 = "Standard"
-  scale_units         = 2
 
-  copy_paste_enabled = true
+  sku = var.bastion_sku
+
+  # Standard-only settings; set null for Basic
+  scale_units         = (var.bastion_sku == "Standard" ? 2 : null)
+  copy_paste_enabled  = (var.bastion_sku == "Standard" ? true : null)
 
   ip_configuration {
     name                 = "IpConf"
@@ -387,4 +543,19 @@ output "vm_public_ip" {
 
 output "bastion_id" {
   value = azurerm_bastion_host.bastion.id
+}
+
+output "key_vault_id" {
+  value       = var.enable_key_vault ? azurerm_key_vault.kv[0].id : null
+  description = "Key Vault ID (if enabled)"
+}
+
+output "log_analytics_workspace_id" {
+  value       = var.enable_log_analytics ? azurerm_log_analytics_workspace.law[0].id : null
+  description = "Log Analytics Workspace ID (if enabled)"
+}
+
+output "recovery_services_vault_id" {
+  value       = var.enable_recovery_services_vault ? azurerm_recovery_services_vault.rsv[0].id : null
+  description = "Recovery Services Vault ID (if enabled)"
 }
