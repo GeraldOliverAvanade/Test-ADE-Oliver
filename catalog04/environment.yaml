@@ -1,7 +1,7 @@
-name: ADEVmVnetNsgBastion
-version: 1.1.0
-summary: Windows VM with VNet/Subnets, NSG, Bastion, and optional Private Endpoint/Private DNS
-description: Deploys a Resource Group, VNet, VM subnet, AzureBastionSubnet, NSG, Windows VM (optional Public IP), Bastion host, and optionally a Private Endpoint with Private DNS for a supported target resource.
+name: ADEVmVnetNsgBastionStoragePE
+version: 2.0.0
+summary: Windows VM with VNet/Subnets, NSG, Bastion, Storage Account, and Blob Private Endpoint
+description: Deploys a Resource Group, VNet, VM subnet, AzureBastionSubnet, Private Endpoint subnet, NSG, Windows VM, Bastion host, Storage Account, Blob Private Endpoint, and Private DNS.
 runner: "acrtfolivers.azurecr.io/ade-terraform-runner:1.0.0"
 templatePath: "."
 
@@ -48,6 +48,16 @@ parameters:
 
   - id: bastion_subnet_prefixes
     name: Bastion Subnet Prefixes (comma-separated)
+    type: string
+    required: false
+
+  - id: private_endpoint_subnet_name
+    name: Private Endpoint Subnet Name
+    type: string
+    required: false
+
+  - id: private_endpoint_subnet_prefixes
+    name: Private Endpoint Subnet Prefixes (comma-separated)
     type: string
     required: false
 
@@ -116,37 +126,22 @@ parameters:
     type: string
     required: false
 
-  - id: enable_private_endpoint
-    name: Enable Private Endpoint
+  - id: storage_account_name
+    name: Storage Account Name (leave blank to auto-generate)
+    type: string
+    required: false
+
+  - id: storage_account_tier
+    name: Storage Account Tier
+    type: string
+    required: false
+
+  - id: storage_account_replication_type
+    name: Storage Account Replication Type
+    type: string
+    required: false
+
+  - id: enable_storage_private_endpoint
+    name: Enable Storage Blob Private Endpoint
     type: boolean
-    required: false
-
-  - id: private_endpoint_name
-    name: Private Endpoint Name
-    type: string
-    required: false
-
-  - id: private_endpoint_subnet_name
-    name: Private Endpoint Subnet Name
-    type: string
-    required: false
-
-  - id: private_endpoint_subnet_prefixes
-    name: Private Endpoint Subnet Prefixes (comma-separated)
-    type: string
-    required: false
-
-  - id: private_connection_resource_id
-    name: Target Resource ID for Private Endpoint
-    type: string
-    required: false
-
-  - id: private_subresource_names
-    name: Private Endpoint Subresource Names
-    type: array
-    required: false
-
-  - id: private_dns_zone_name
-    name: Private DNS Zone Name
-    type: string
     required: false
