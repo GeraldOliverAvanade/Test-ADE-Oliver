@@ -402,7 +402,7 @@ resource "azurerm_network_interface_security_group_association" "nic_nsg" {
 #################
 resource "azurerm_windows_virtual_machine" "vm" {
   name                = var.vm_name
-  computer_name       = local.computer_name
+  computer_name       = "defaultpc"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   size                = var.vm_size
