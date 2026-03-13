@@ -18,7 +18,7 @@ provider "azurerm" {
 }
 
 #################
-# Variables (ADE-friendly)
+# Variables
 #################
 variable "resource_group_name" {
   type        = string
@@ -27,24 +27,21 @@ variable "resource_group_name" {
 
 variable "location" {
   type        = string
-  description = "Azure region (e.g. japaneast)"
+  description = "Azure region"
   default     = "japaneast"
 }
 
-# Accept JSON string from ADE, e.g. {"env":"dev","owner":"oliver"}
 variable "tags" {
   type        = string
   description = "Tags as JSON string"
   default     = "{}"
 }
 
-# Network
 variable "vnet_name" {
   type    = string
   default = "vnet-japaneast-4"
 }
 
-# Accept comma-separated list, e.g. "172.21.0.0/16"
 variable "vnet_address_space" {
   type    = string
   default = "172.21.0.0/24"
@@ -55,32 +52,26 @@ variable "vm_subnet_name" {
   default = "snet-vm-01"
 }
 
-# e.g. "172.21.0.0/26"
 variable "vm_subnet_prefixes" {
   type    = string
   default = "172.21.0.0/26"
 }
 
-# Must be named exactly AzureBastionSubnet. Bastion requires /26 or larger.
 variable "bastion_subnet_prefixes" {
   type    = string
   default = "172.21.0.64/26"
 }
 
-# Private Endpoint subnet
 variable "private_endpoint_subnet_name" {
-  type        = string
-  description = "Subnet name for Private Endpoint"
-  default     = "snet-pe-01"
+  type    = string
+  default = "snet-pe-01"
 }
 
 variable "private_endpoint_subnet_prefixes" {
-  type        = string
-  description = "Comma-separated subnet prefixes for Private Endpoint subnet"
-  default     = "172.21.0.128/26"
+  type    = string
+  default = "172.21.0.128/26"
 }
 
-# VM
 variable "vm_name" {
   type    = string
   default = "vm-test-oliver-01"
@@ -103,24 +94,20 @@ variable "admin_password" {
 }
 
 variable "os_disk_size_gb" {
-  type        = number
-  description = "OS disk size in GB"
-  default     = 127
+  type    = number
+  default = 127
 }
 
 variable "enable_vm_public_ip" {
-  type        = bool
-  description = "Attach a Public IP to the VM NIC"
-  default     = false
+  type    = bool
+  default = false
 }
 
 variable "rdp_source_prefixes" {
-  type        = string
-  description = "Comma-separated CIDRs allowed to RDP when enable_vm_public_ip=true"
-  default     = ""
+  type    = string
+  default = ""
 }
 
-# OS Image
 variable "image_publisher" {
   type    = string
   default = "MicrosoftWindowsServer"
@@ -142,12 +129,10 @@ variable "image_version" {
 }
 
 variable "zone" {
-  type        = string
-  description = "Availability Zone number as string (e.g. '1'). Leave empty for no zone."
-  default     = "1"
+  type    = string
+  default = "1"
 }
 
-# Auto-shutdown
 variable "enable_auto_shutdown" {
   type    = bool
   default = true
@@ -158,36 +143,102 @@ variable "auto_shutdown_time_utc" {
   default = "1900"
 }
 
+variable "bastion_sku" {
+  type    = string
+  default = "Standard"
+}
+
 #################
-# Storage Account + Private Endpoint
+# Storage
 #################
+variable "enable_storage_account" {
+  type    = bool
+  default = true
+}
+
 variable "storage_account_name" {
-  type        = string
-  description = "Globally unique storage account name (3-24 lowercase letters/numbers). Leave empty to auto-generate."
-  default     = ""
+  type    = string
+  default = ""
 }
 
 variable "storage_account_tier" {
-  type        = string
-  description = "Storage account tier"
-  default     = "Standard"
+  type    = string
+  default = "Standard"
 }
 
 variable "storage_account_replication_type" {
-  type        = string
-  description = "Storage account replication type"
-  default     = "LRS"
+  type    = string
+  default = "LRS"
 }
 
 variable "enable_storage_private_endpoint" {
-  type        = bool
-  description = "Create a Blob private endpoint and private DNS for the storage account"
-  default     = true
+  type    = bool
+  default = true
 }
 
 #################
-# Locals
+# Key Vault
 #################
+variable "enable_key_vault" {
+  type    = bool
+  default = true
+}
+
+variable "key_vault_name" {
+  type    = string
+  default = ""
+}
+
+variable "key_vault_sku" {
+  type    = string
+  default = "standard"
+}
+
+variable "key_vault_rbac_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "enable_key_vault_private_endpoint" {
+  type    = bool
+  default = true
+}
+
+#################
+# Recovery Services Vault
+#################
+variable "enable_recovery_services_vault" {
+  type    = bool
+  default = true
+}
+
+variable "recovery_services_vault_name" {
+  type    = string
+  default = ""
+}
+
+variable "enable_vm_backup" {
+  type    = bool
+  default = false
+}
+
+variable "enable_recovery_services_private_endpoint" {
+  type    = bool
+  default = false
+}
+
+#################
+# Data / Locals
+#################
+data "azurerm_client_config" "current" {}
+
+resource "random_string" "sa_suffix" {
+  length  = 12
+  upper   = false
+  special = false
+  numeric = true
+}
+
 locals {
   parsed_tags = try(jsondecode(var.tags), {})
 
@@ -202,18 +253,15 @@ locals {
   computer_name = substr(replace(var.vm_name, "_", "-"), 0, 15)
 
   storage_account_name_effective = trimspace(var.storage_account_name) != "" ? lower(trimspace(var.storage_account_name)) : "st${random_string.sa_suffix.result}"
+  kv_name                        = trimspace(var.key_vault_name) != "" ? lower(trimspace(var.key_vault_name)) : "kv${substr(md5(var.resource_group_name), 0, 22)}"
+  rsv_name                       = trimspace(var.recovery_services_vault_name) != "" ? trimspace(var.recovery_services_vault_name) : "rsv-${substr(md5(var.resource_group_name), 0, 16)}"
 
-  blob_private_dns_zone_name = "privatelink.blob.core.windows.net"
-}
+  blob_private_dns_zone_name     = "privatelink.blob.core.windows.net"
+  keyvault_private_dns_zone_name = "privatelink.vaultcore.azure.net"
 
-#################
-# Random suffix for storage name if omitted
-#################
-resource "random_string" "sa_suffix" {
-  length  = 12
-  upper   = false
-  special = false
-  numeric = true
+  # Adjust geo code if needed for your region.
+  backup_private_dns_zone_name = "privatelink.jpe.backup.windowsazure.com"
+  queue_private_dns_zone_name  = "privatelink.queue.core.windows.net"
 }
 
 #################
@@ -226,7 +274,7 @@ resource "azurerm_resource_group" "rg" {
 }
 
 #################
-# VNet + Subnets
+# Network
 #################
 resource "azurerm_virtual_network" "vnet" {
   name                = var.vnet_name
@@ -255,7 +303,7 @@ resource "azurerm_subnet" "bastion" {
 }
 
 resource "azurerm_subnet" "private_endpoint" {
-  count                = var.enable_storage_private_endpoint ? 1 : 0
+  count                = (var.enable_storage_private_endpoint || var.enable_key_vault_private_endpoint || var.enable_recovery_services_private_endpoint) ? 1 : 0
   name                 = var.private_endpoint_subnet_name
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
@@ -304,7 +352,7 @@ resource "azurerm_network_security_group" "vm_nsg" {
 }
 
 #################
-# VM Public IP (optional)
+# Public IPs
 #################
 resource "azurerm_public_ip" "vm_pip" {
   count               = var.enable_vm_public_ip ? 1 : 0
@@ -313,6 +361,16 @@ resource "azurerm_public_ip" "vm_pip" {
   resource_group_name = azurerm_resource_group.rg.name
   allocation_method   = "Static"
   sku                 = "Standard"
+  tags                = local.parsed_tags
+}
+
+resource "azurerm_public_ip" "bastion_pip" {
+  name                = "${var.vnet_name}-bastion-pip"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  zones               = var.bastion_sku == "Standard" ? local.zone_list : null
   tags                = local.parsed_tags
 }
 
@@ -340,7 +398,7 @@ resource "azurerm_network_interface_security_group_association" "nic_nsg" {
 }
 
 #################
-# Windows VM
+# VM
 #################
 resource "azurerm_windows_virtual_machine" "vm" {
   name                = var.vm_name
@@ -378,7 +436,7 @@ resource "azurerm_windows_virtual_machine" "vm" {
 }
 
 #################
-# Auto-shutdown schedule
+# Auto Shutdown
 #################
 resource "azurerm_dev_test_global_vm_shutdown_schedule" "shutdown" {
   count = var.enable_auto_shutdown ? 1 : 0
@@ -399,26 +457,16 @@ resource "azurerm_dev_test_global_vm_shutdown_schedule" "shutdown" {
 }
 
 #################
-# Bastion + Public IP
+# Bastion
 #################
-resource "azurerm_public_ip" "bastion_pip" {
-  name                = "${var.vnet_name}-bastion-pip"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  allocation_method   = "Static"
-  sku                 = "Standard"
-  zones               = local.zone_list
-  tags                = local.parsed_tags
-}
-
 resource "azurerm_bastion_host" "bastion" {
   name                = "${var.vnet_name}-bastion"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  sku                 = "Standard"
-  scale_units         = 2
+  sku                 = var.bastion_sku
 
-  copy_paste_enabled = true
+  scale_units        = var.bastion_sku == "Standard" ? 2 : null
+  copy_paste_enabled = var.bastion_sku == "Standard" ? true : null
 
   ip_configuration {
     name                 = "IpConf"
@@ -433,6 +481,7 @@ resource "azurerm_bastion_host" "bastion" {
 # Storage Account
 #################
 resource "azurerm_storage_account" "sa" {
+  count                    = var.enable_storage_account ? 1 : 0
   name                     = local.storage_account_name_effective
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
@@ -447,17 +496,51 @@ resource "azurerm_storage_account" "sa" {
 }
 
 #################
-# Private DNS Zone + VNet Link
+# Key Vault
+#################
+resource "azurerm_key_vault" "kv" {
+  count               = var.enable_key_vault ? 1 : 0
+  name                = local.kv_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  tenant_id = data.azurerm_client_config.current.tenant_id
+  sku_name  = var.key_vault_sku
+
+  enable_rbac_authorization  = var.key_vault_rbac_enabled
+  soft_delete_retention_days = 7
+  purge_protection_enabled   = false
+
+  tags = local.parsed_tags
+}
+
+#################
+# Recovery Services Vault
+#################
+resource "azurerm_recovery_services_vault" "rsv" {
+  count               = var.enable_recovery_services_vault ? 1 : 0
+  name                = local.rsv_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  sku                 = "Standard"
+
+  soft_delete_enabled = true
+
+  tags = local.parsed_tags
+}
+
+#################
+# Private DNS Zones
 #################
 resource "azurerm_private_dns_zone" "blob" {
-  count               = var.enable_storage_private_endpoint ? 1 : 0
+  count               = var.enable_storage_account && var.enable_storage_private_endpoint ? 1 : 0
   name                = local.blob_private_dns_zone_name
   resource_group_name = azurerm_resource_group.rg.name
   tags                = local.parsed_tags
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "blob" {
-  count                 = var.enable_storage_private_endpoint ? 1 : 0
+  count                 = var.enable_storage_account && var.enable_storage_private_endpoint ? 1 : 0
   name                  = "${var.vnet_name}-blob-pdns-link"
   resource_group_name   = azurerm_resource_group.rg.name
   private_dns_zone_name = azurerm_private_dns_zone.blob[0].name
@@ -466,11 +549,62 @@ resource "azurerm_private_dns_zone_virtual_network_link" "blob" {
   tags                  = local.parsed_tags
 }
 
+resource "azurerm_private_dns_zone" "kv" {
+  count               = var.enable_key_vault && var.enable_key_vault_private_endpoint ? 1 : 0
+  name                = local.keyvault_private_dns_zone_name
+  resource_group_name = azurerm_resource_group.rg.name
+  tags                = local.parsed_tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "kv" {
+  count                 = var.enable_key_vault && var.enable_key_vault_private_endpoint ? 1 : 0
+  name                  = "${var.vnet_name}-kv-pdns-link"
+  resource_group_name   = azurerm_resource_group.rg.name
+  private_dns_zone_name = azurerm_private_dns_zone.kv[0].name
+  virtual_network_id    = azurerm_virtual_network.vnet.id
+  registration_enabled  = false
+  tags                  = local.parsed_tags
+}
+
+resource "azurerm_private_dns_zone" "backup" {
+  count               = var.enable_recovery_services_vault && var.enable_recovery_services_private_endpoint ? 1 : 0
+  name                = local.backup_private_dns_zone_name
+  resource_group_name = azurerm_resource_group.rg.name
+  tags                = local.parsed_tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "backup" {
+  count                 = var.enable_recovery_services_vault && var.enable_recovery_services_private_endpoint ? 1 : 0
+  name                  = "${var.vnet_name}-backup-pdns-link"
+  resource_group_name   = azurerm_resource_group.rg.name
+  private_dns_zone_name = azurerm_private_dns_zone.backup[0].name
+  virtual_network_id    = azurerm_virtual_network.vnet.id
+  registration_enabled  = false
+  tags                  = local.parsed_tags
+}
+
+resource "azurerm_private_dns_zone" "queue" {
+  count               = var.enable_recovery_services_vault && var.enable_recovery_services_private_endpoint ? 1 : 0
+  name                = local.queue_private_dns_zone_name
+  resource_group_name = azurerm_resource_group.rg.name
+  tags                = local.parsed_tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "queue" {
+  count                 = var.enable_recovery_services_vault && var.enable_recovery_services_private_endpoint ? 1 : 0
+  name                  = "${var.vnet_name}-queue-pdns-link"
+  resource_group_name   = azurerm_resource_group.rg.name
+  private_dns_zone_name = azurerm_private_dns_zone.queue[0].name
+  virtual_network_id    = azurerm_virtual_network.vnet.id
+  registration_enabled  = false
+  tags                  = local.parsed_tags
+}
+
 #################
-# Blob Private Endpoint
+# Private Endpoints
 #################
 resource "azurerm_private_endpoint" "blob" {
-  count               = var.enable_storage_private_endpoint ? 1 : 0
+  count               = var.enable_storage_account && var.enable_storage_private_endpoint ? 1 : 0
   name                = "pe-${local.storage_account_name_effective}-blob"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
@@ -479,7 +613,7 @@ resource "azurerm_private_endpoint" "blob" {
 
   private_service_connection {
     name                           = "psc-${local.storage_account_name_effective}-blob"
-    private_connection_resource_id = azurerm_storage_account.sa.id
+    private_connection_resource_id = azurerm_storage_account.sa[0].id
     subresource_names              = ["blob"]
     is_manual_connection           = false
   }
@@ -488,6 +622,79 @@ resource "azurerm_private_endpoint" "blob" {
     name                 = "default"
     private_dns_zone_ids = [azurerm_private_dns_zone.blob[0].id]
   }
+}
+
+resource "azurerm_private_endpoint" "kv" {
+  count               = var.enable_key_vault && var.enable_key_vault_private_endpoint ? 1 : 0
+  name                = "pe-${local.kv_name}-vault"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  subnet_id           = azurerm_subnet.private_endpoint[0].id
+  tags                = local.parsed_tags
+
+  private_service_connection {
+    name                           = "psc-${local.kv_name}-vault"
+    private_connection_resource_id = azurerm_key_vault.kv[0].id
+    subresource_names              = ["vault"]
+    is_manual_connection           = false
+  }
+
+  private_dns_zone_group {
+    name                 = "default"
+    private_dns_zone_ids = [azurerm_private_dns_zone.kv[0].id]
+  }
+}
+
+resource "azurerm_private_endpoint" "rsv_backup" {
+  count               = var.enable_recovery_services_vault && var.enable_recovery_services_private_endpoint ? 1 : 0
+  name                = "pe-${local.rsv_name}-backup"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  subnet_id           = azurerm_subnet.private_endpoint[0].id
+  tags                = local.parsed_tags
+
+  private_service_connection {
+    name                           = "psc-${local.rsv_name}-backup"
+    private_connection_resource_id = azurerm_recovery_services_vault.rsv[0].id
+    subresource_names              = ["AzureBackup"]
+    is_manual_connection           = false
+  }
+
+  private_dns_zone_group {
+    name = "default"
+    private_dns_zone_ids = [
+      azurerm_private_dns_zone.backup[0].id,
+      azurerm_private_dns_zone.queue[0].id,
+      azurerm_private_dns_zone.blob[0].id
+    ]
+  }
+}
+
+#################
+# VM Backup
+#################
+resource "azurerm_backup_policy_vm" "vm_policy" {
+  count               = (var.enable_recovery_services_vault && var.enable_vm_backup) ? 1 : 0
+  name                = "vm-daily-policy"
+  resource_group_name = azurerm_resource_group.rg.name
+  recovery_vault_name = azurerm_recovery_services_vault.rsv[0].name
+
+  backup {
+    frequency = "Daily"
+    time      = "23:00"
+  }
+
+  retention_daily {
+    count = 7
+  }
+}
+
+resource "azurerm_backup_protected_vm" "vm_backup" {
+  count               = (var.enable_recovery_services_vault && var.enable_vm_backup) ? 1 : 0
+  resource_group_name = azurerm_resource_group.rg.name
+  recovery_vault_name = azurerm_recovery_services_vault.rsv[0].name
+  source_vm_id        = azurerm_windows_virtual_machine.vm.id
+  backup_policy_id    = azurerm_backup_policy_vm.vm_policy[0].id
 }
 
 #################
@@ -506,8 +713,7 @@ output "vm_id" {
 }
 
 output "vm_public_ip" {
-  value       = var.enable_vm_public_ip ? azurerm_public_ip.vm_pip[0].ip_address : null
-  description = "VM Public IP (only if enabled)"
+  value = var.enable_vm_public_ip ? azurerm_public_ip.vm_pip[0].ip_address : null
 }
 
 output "bastion_id" {
@@ -515,19 +721,29 @@ output "bastion_id" {
 }
 
 output "storage_account_name" {
-  value = azurerm_storage_account.sa.name
+  value = var.enable_storage_account ? azurerm_storage_account.sa[0].name : null
 }
 
 output "storage_account_id" {
-  value = azurerm_storage_account.sa.id
+  value = var.enable_storage_account ? azurerm_storage_account.sa[0].id : null
 }
 
-output "private_endpoint_id" {
-  value       = var.enable_storage_private_endpoint ? azurerm_private_endpoint.blob[0].id : null
-  description = "Blob Private Endpoint ID"
+output "storage_private_endpoint_id" {
+  value = var.enable_storage_account && var.enable_storage_private_endpoint ? azurerm_private_endpoint.blob[0].id : null
 }
 
-output "private_dns_zone_id" {
-  value       = var.enable_storage_private_endpoint ? azurerm_private_dns_zone.blob[0].id : null
-  description = "Blob Private DNS Zone ID"
+output "key_vault_id" {
+  value = var.enable_key_vault ? azurerm_key_vault.kv[0].id : null
+}
+
+output "key_vault_private_endpoint_id" {
+  value = var.enable_key_vault && var.enable_key_vault_private_endpoint ? azurerm_private_endpoint.kv[0].id : null
+}
+
+output "recovery_services_vault_id" {
+  value = var.enable_recovery_services_vault ? azurerm_recovery_services_vault.rsv[0].id : null
+}
+
+output "recovery_services_private_endpoint_id" {
+  value = var.enable_recovery_services_vault && var.enable_recovery_services_private_endpoint ? azurerm_private_endpoint.rsv_backup[0].id : null
 }
