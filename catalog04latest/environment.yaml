@@ -1,4 +1,4 @@
-name: name: ADEVmVnetNsgBastion
+name: ADEVmVnetNsgBastion
 version: 2.0.0
 summary: Windows VM with VNet/Subnets, NSG, Bastion, Storage Account, and Blob Private Endpoint
 description: Deploys a Resource Group, VNet, VM subnet, AzureBastionSubnet, Private Endpoint subnet, NSG, Windows VM, Bastion host, Storage Account, Blob Private Endpoint, and Private DNS.
