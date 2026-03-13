@@ -1,7 +1,7 @@
-name: ADEVmVnetNsgBastion4
+name: ADEVmVnetNsgBastionStoragePE
 version: 1.0.0
-summary: Windows VM with VNet/Subnets, NSG, Bastion + KV + Log Analytics + RSV + Storage (Terraform)
-description: Deploys Resource Group, VNet/Subnets, NSG, Windows VM (optional Public IP), Bastion (Basic/Standard), optional Key Vault, Log Analytics, Recovery Services Vault (+ optional VM backup), and optional Storage Account.
+summary: Windows VM with VNet/Subnets, NSG, Bastion, Storage Account, and Blob Private Endpoint
+description: Deploys a Resource Group, VNet, VM subnet, AzureBastionSubnet, Private Endpoint subnet, NSG, Windows VM, Bastion host, Storage Account, Blob Private Endpoint, and Private DNS.
 runner: "acrtfolivers.azurecr.io/ade-terraform-runner:1.0.0"
 templatePath: "."
 
@@ -22,7 +22,7 @@ parameters:
     required: true
 
   - id: tags
-    name: Tags (JSON map)
+    name: Tags (JSON string)
     type: string
     required: false
 
@@ -48,6 +48,16 @@ parameters:
 
   - id: bastion_subnet_prefixes
     name: Bastion Subnet Prefixes (comma-separated)
+    type: string
+    required: false
+
+  - id: private_endpoint_subnet_name
+    name: Private Endpoint Subnet Name
+    type: string
+    required: false
+
+  - id: private_endpoint_subnet_prefixes
+    name: Private Endpoint Subnet Prefixes (comma-separated)
     type: string
     required: false
 
@@ -116,78 +126,22 @@ parameters:
     type: string
     required: false
 
-  - id: bastion_sku
-    name: Bastion SKU (Basic/Standard)
-    type: string
-    required: false
-
-  - id: enable_key_vault
-    name: Enable Key Vault
-    type: boolean
-    required: false
-
-  - id: key_vault_name
-    name: Key Vault Name (optional)
-    type: string
-    required: false
-
-  - id: key_vault_sku
-    name: Key Vault SKU (standard/premium)
-    type: string
-    required: false
-
-  - id: key_vault_rbac_enabled
-    name: Key Vault RBAC Enabled
-    type: boolean
-    required: false
-
-  - id: enable_log_analytics
-    name: Enable Log Analytics
-    type: boolean
-    required: false
-
-  - id: log_analytics_name
-    name: Log Analytics Workspace Name (optional)
-    type: string
-    required: false
-
-  - id: log_analytics_retention_days
-    name: Log Analytics Retention Days
-    type: number
-    required: false
-
-  - id: enable_recovery_services_vault
-    name: Enable Recovery Services Vault
-    type: boolean
-    required: false
-
-  - id: recovery_services_vault_name
-    name: Recovery Services Vault Name (optional)
-    type: string
-    required: false
-
-  - id: enable_vm_backup
-    name: Enable VM Backup (to Recovery Services Vault)
-    type: boolean
-    required: false
-
-  # Storage Account ✅ NEW
-  - id: enable_storage_account
-    name: Enable Storage Account
-    type: boolean
-    required: false
-
   - id: storage_account_name
-    name: Storage Account Name (optional)
+    name: Storage Account Name (leave blank to auto-generate)
     type: string
     required: false
 
   - id: storage_account_tier
-    name: Storage Account Tier (Standard/Premium)
+    name: Storage Account Tier
     type: string
     required: false
 
   - id: storage_account_replication_type
-    name: Storage Replication (LRS/GRS/ZRS/RAGRS)
+    name: Storage Account Replication Type
     type: string
+    required: false
+
+  - id: enable_storage_private_endpoint
+    name: Enable Storage Blob Private Endpoint
+    type: boolean
     required: false
