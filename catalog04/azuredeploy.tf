@@ -1,8 +1,14 @@
 terraform {
+  required_version = ">= 1.5.0"
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
       version = "4.58.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
     }
   }
 }
@@ -41,24 +47,37 @@ variable "vnet_name" {
 # Accept comma-separated list, e.g. "172.21.0.0/16"
 variable "vnet_address_space" {
   type    = string
-  default = "172.21.0.0/16"
+  default = "172.21.0.0/24"
 }
 
 variable "vm_subnet_name" {
   type    = string
-  default = "snet-japaneast-1"
+  default = "snet-vm-01"
 }
 
-# e.g. "172.21.0.0/24"
+# e.g. "172.21.0.0/26"
 variable "vm_subnet_prefixes" {
   type    = string
-  default = "172.21.0.0/24"
+  default = "172.21.0.0/26"
 }
 
-# Must be named exactly AzureBastionSubnet
+# Must be named exactly AzureBastionSubnet. Bastion requires /26 or larger.
 variable "bastion_subnet_prefixes" {
   type    = string
-  default = "172.21.1.0/26"
+  default = "172.21.0.64/26"
+}
+
+# Private Endpoint subnet
+variable "private_endpoint_subnet_name" {
+  type        = string
+  description = "Subnet name for Private Endpoint"
+  default     = "snet-pe-01"
+}
+
+variable "private_endpoint_subnet_prefixes" {
+  type        = string
+  description = "Comma-separated subnet prefixes for Private Endpoint subnet"
+  default     = "172.21.0.128/26"
 }
 
 # VM
@@ -83,29 +102,25 @@ variable "admin_password" {
   description = "Windows admin password"
 }
 
-# VM OS Disk
 variable "os_disk_size_gb" {
   type        = number
   description = "OS disk size in GB"
   default     = 127
 }
 
-# VM Public IP (for direct access). Bastion still has its own public IP regardless.
 variable "enable_vm_public_ip" {
   type        = bool
   description = "Attach a Public IP to the VM NIC"
   default     = false
 }
 
-# Optional: allow RDP from these CIDRs if VM has public IP enabled
-# Comma-separated list, e.g. "203.0.113.10/32,203.0.113.11/32"
 variable "rdp_source_prefixes" {
   type        = string
   description = "Comma-separated CIDRs allowed to RDP when enable_vm_public_ip=true"
   default     = ""
 }
 
-# OS Image (user-definable)
+# OS Image
 variable "image_publisher" {
   type    = string
   default = "MicrosoftWindowsServer"
@@ -132,87 +147,73 @@ variable "zone" {
   default     = "1"
 }
 
-# Auto-shutdown (optional)
+# Auto-shutdown
 variable "enable_auto_shutdown" {
   type    = bool
   default = true
 }
 
-# HHmm in UTC, e.g. 1900
 variable "auto_shutdown_time_utc" {
   type    = string
   default = "1900"
 }
 
 #################
-# Private Endpoint / Private DNS (generic optional block)
+# Storage Account + Private Endpoint
 #################
-variable "enable_private_endpoint" {
+variable "storage_account_name" {
+  type        = string
+  description = "Globally unique storage account name (3-24 lowercase letters/numbers). Leave empty to auto-generate."
+  default     = ""
+}
+
+variable "storage_account_tier" {
+  type        = string
+  description = "Storage account tier"
+  default     = "Standard"
+}
+
+variable "storage_account_replication_type" {
+  type        = string
+  description = "Storage account replication type"
+  default     = "LRS"
+}
+
+variable "enable_storage_private_endpoint" {
   type        = bool
-  description = "Enable Private Endpoint for a supported Azure resource"
-  default     = false
+  description = "Create a Blob private endpoint and private DNS for the storage account"
+  default     = true
 }
 
-variable "private_endpoint_name" {
-  type        = string
-  description = "Private Endpoint name"
-  default     = "pe-default"
-}
-
-variable "private_endpoint_subnet_name" {
-  type        = string
-  description = "Subnet name for Private Endpoint"
-  default     = "snet-private-endpoint-1"
-}
-
-variable "private_endpoint_subnet_prefixes" {
-  type        = string
-  description = "Comma-separated subnet prefixes for Private Endpoint subnet"
-  default     = "172.21.2.0/24"
-}
-
-variable "private_connection_resource_id" {
-  type        = string
-  description = "Resource ID of the target Azure resource that supports Private Endpoint"
-  default     = ""
-}
-
-variable "private_subresource_names" {
-  type        = list(string)
-  description = "Subresource names for the target service, e.g. [\"blob\"], [\"vault\"], [\"sqlServer\"]"
-  default     = []
-}
-
-variable "private_dns_zone_name" {
-  type        = string
-  description = "Private DNS zone name, e.g. privatelink.blob.core.windows.net"
-  default     = ""
-}
-
+#################
+# Locals
+#################
 locals {
   parsed_tags = try(jsondecode(var.tags), {})
 
-  vnet_address_space_list      = [for s in split(",", var.vnet_address_space) : trimspace(s)]
-  vm_subnet_prefixes_list      = [for s in split(",", var.vm_subnet_prefixes) : trimspace(s)]
-  bastion_subnet_prefixes_list = [for s in split(",", var.bastion_subnet_prefixes) : trimspace(s)]
-  pe_subnet_prefixes_list      = [for s in split(",", var.private_endpoint_subnet_prefixes) : trimspace(s)]
+  vnet_address_space_list      = [for s in split(",", var.vnet_address_space) : trimspace(s) if trimspace(s) != ""]
+  vm_subnet_prefixes_list      = [for s in split(",", var.vm_subnet_prefixes) : trimspace(s) if trimspace(s) != ""]
+  bastion_subnet_prefixes_list = [for s in split(",", var.bastion_subnet_prefixes) : trimspace(s) if trimspace(s) != ""]
+  pe_subnet_prefixes_list      = [for s in split(",", var.private_endpoint_subnet_prefixes) : trimspace(s) if trimspace(s) != ""]
   rdp_source_prefixes_list     = [for s in split(",", var.rdp_source_prefixes) : trimspace(s) if trimspace(s) != ""]
 
-  zone_list = (trimspace(var.zone) == "" ? [] : [trimspace(var.zone)])
+  zone_list = trimspace(var.zone) == "" ? [] : [trimspace(var.zone)]
 
-  # Windows computer_name max 15 chars
   computer_name = substr(replace(var.vm_name, "_", "-"), 0, 15)
 
-  create_private_endpoint = (
-    var.enable_private_endpoint &&
-    trimspace(var.private_connection_resource_id) != "" &&
-    length(var.private_subresource_names) > 0
-  )
+  storage_account_name_effective = trimspace(var.storage_account_name) != "" ? lower(trimspace(var.storage_account_name)) : "st${random_string.sa_suffix.result}"
 
-  create_private_dns_zone = (
-    local.create_private_endpoint &&
-    trimspace(var.private_dns_zone_name) != ""
-  )
+  blob_private_dns_zone_name = "privatelink.blob.core.windows.net"
+}
+
+#################
+# Random suffix for storage name if omitted
+#################
+resource "random_string" "sa_suffix" {
+  length  = 12
+  upper   = false
+  special = false
+  numeric = true
 }
 
 #################
@@ -254,7 +255,7 @@ resource "azurerm_subnet" "bastion" {
 }
 
 resource "azurerm_subnet" "private_endpoint" {
-  count                = local.create_private_endpoint ? 1 : 0
+  count                = var.enable_storage_private_endpoint ? 1 : 0
   name                 = var.private_endpoint_subnet_name
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
@@ -265,8 +266,6 @@ resource "azurerm_subnet" "private_endpoint" {
 
 #################
 # NSG
-# - Always allow RDP only from Bastion subnet
-# - Optionally allow RDP from user CIDRs if VM has public IP enabled
 #################
 resource "azurerm_network_security_group" "vm_nsg" {
   name                = "${var.vm_name}-nsg"
@@ -288,7 +287,7 @@ resource "azurerm_network_security_group" "vm_nsg" {
   }
 
   dynamic "security_rule" {
-    for_each = (var.enable_vm_public_ip && length(local.rdp_source_prefixes_list) > 0) ? local.rdp_source_prefixes_list : []
+    for_each = var.enable_vm_public_ip && length(local.rdp_source_prefixes_list) > 0 ? local.rdp_source_prefixes_list : []
     content {
       name                       = "Allow-RDP-From-${replace(replace(security_rule.value, "/", "-"), ".", "-")}"
       priority                   = 400 + index(local.rdp_source_prefixes_list, security_rule.value)
@@ -312,15 +311,13 @@ resource "azurerm_public_ip" "vm_pip" {
   name                = "${var.vm_name}-pip"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-
-  allocation_method = "Static"
-  sku               = "Standard"
-
-  tags = local.parsed_tags
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  tags                = local.parsed_tags
 }
 
 #################
-# NIC (Public IP optional)
+# NIC
 #################
 resource "azurerm_network_interface" "nic" {
   name                = "${var.vm_name}-nic"
@@ -375,13 +372,13 @@ resource "azurerm_windows_virtual_machine" "vm" {
     version   = var.image_version
   }
 
-  zone = (trimspace(var.zone) == "" ? null : trimspace(var.zone))
+  zone = trimspace(var.zone) == "" ? null : trimspace(var.zone)
 
   tags = local.parsed_tags
 }
 
 #################
-# Auto-shutdown schedule (optional)
+# Auto-shutdown schedule
 #################
 resource "azurerm_dev_test_global_vm_shutdown_schedule" "shutdown" {
   count = var.enable_auto_shutdown ? 1 : 0
@@ -408,12 +405,10 @@ resource "azurerm_public_ip" "bastion_pip" {
   name                = "${var.vnet_name}-bastion-pip"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-
-  allocation_method = "Static"
-  sku               = "Standard"
-  zones             = local.zone_list
-
-  tags = local.parsed_tags
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  zones               = local.zone_list
+  tags                = local.parsed_tags
 }
 
 resource "azurerm_bastion_host" "bastion" {
@@ -435,49 +430,63 @@ resource "azurerm_bastion_host" "bastion" {
 }
 
 #################
-# Private DNS Zone + VNet Link (optional)
+# Storage Account
 #################
-resource "azurerm_private_dns_zone" "this" {
-  count               = local.create_private_dns_zone ? 1 : 0
-  name                = var.private_dns_zone_name
+resource "azurerm_storage_account" "sa" {
+  name                     = local.storage_account_name_effective
+  resource_group_name      = azurerm_resource_group.rg.name
+  location                 = azurerm_resource_group.rg.location
+  account_tier             = var.storage_account_tier
+  account_replication_type = var.storage_account_replication_type
+
+  min_tls_version                 = "TLS1_2"
+  public_network_access_enabled   = true
+  allow_nested_items_to_be_public = false
+
+  tags = local.parsed_tags
+}
+
+#################
+# Private DNS Zone + VNet Link
+#################
+resource "azurerm_private_dns_zone" "blob" {
+  count               = var.enable_storage_private_endpoint ? 1 : 0
+  name                = local.blob_private_dns_zone_name
   resource_group_name = azurerm_resource_group.rg.name
   tags                = local.parsed_tags
 }
 
-resource "azurerm_private_dns_zone_virtual_network_link" "this" {
-  count                 = local.create_private_dns_zone ? 1 : 0
-  name                  = "${var.vnet_name}-pdns-link"
+resource "azurerm_private_dns_zone_virtual_network_link" "blob" {
+  count                 = var.enable_storage_private_endpoint ? 1 : 0
+  name                  = "${var.vnet_name}-blob-pdns-link"
   resource_group_name   = azurerm_resource_group.rg.name
-  private_dns_zone_name = azurerm_private_dns_zone.this[0].name
+  private_dns_zone_name = azurerm_private_dns_zone.blob[0].name
   virtual_network_id    = azurerm_virtual_network.vnet.id
   registration_enabled  = false
   tags                  = local.parsed_tags
 }
 
 #################
-# Private Endpoint (optional)
+# Blob Private Endpoint
 #################
-resource "azurerm_private_endpoint" "this" {
-  count               = local.create_private_endpoint ? 1 : 0
-  name                = var.private_endpoint_name
+resource "azurerm_private_endpoint" "blob" {
+  count               = var.enable_storage_private_endpoint ? 1 : 0
+  name                = "pe-${local.storage_account_name_effective}-blob"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   subnet_id           = azurerm_subnet.private_endpoint[0].id
   tags                = local.parsed_tags
 
   private_service_connection {
-    name                           = "${var.private_endpoint_name}-psc"
-    private_connection_resource_id = var.private_connection_resource_id
-    subresource_names              = var.private_subresource_names
+    name                           = "psc-${local.storage_account_name_effective}-blob"
+    private_connection_resource_id = azurerm_storage_account.sa.id
+    subresource_names              = ["blob"]
     is_manual_connection           = false
   }
 
-  dynamic "private_dns_zone_group" {
-    for_each = local.create_private_dns_zone ? [1] : []
-    content {
-      name                 = "default"
-      private_dns_zone_ids = [azurerm_private_dns_zone.this[0].id]
-    }
+  private_dns_zone_group {
+    name                 = "default"
+    private_dns_zone_ids = [azurerm_private_dns_zone.blob[0].id]
   }
 }
 
@@ -505,12 +514,20 @@ output "bastion_id" {
   value = azurerm_bastion_host.bastion.id
 }
 
+output "storage_account_name" {
+  value = azurerm_storage_account.sa.name
+}
+
+output "storage_account_id" {
+  value = azurerm_storage_account.sa.id
+}
+
 output "private_endpoint_id" {
-  value       = local.create_private_endpoint ? azurerm_private_endpoint.this[0].id : null
-  description = "Private Endpoint ID"
+  value       = var.enable_storage_private_endpoint ? azurerm_private_endpoint.blob[0].id : null
+  description = "Blob Private Endpoint ID"
 }
 
 output "private_dns_zone_id" {
-  value       = local.create_private_dns_zone ? azurerm_private_dns_zone.this[0].id : null
-  description = "Private DNS Zone ID"
+  value       = var.enable_storage_private_endpoint ? azurerm_private_dns_zone.blob[0].id : null
+  description = "Blob Private DNS Zone ID"
 }
