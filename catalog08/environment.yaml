@@ -1,0 +1,67 @@
+name: ADEVnetAppiLog
+version: 1.0.0
+summary: Deploy VNET, Application Insights, and Log Analytics
+description: Deploys a Resource Group, Virtual Network, Log Analytics Workspace, and Application Insights using Terraform.
+runner: "acrtfolivers.azurecr.io/ade-terraform-runner:1.0.0"
+templatePath: "azuredeploy.tf"
+
+parameters:
+  - id: resource_group_name
+    name: Resource Group Name
+    type: string
+    required: false
+    default: "rgtesttfoliver"
+
+  - id: location
+    name: Location
+    type: string
+    required: false
+    default: "japaneast"
+
+  - id: tags
+    name: Tags (JSON string)
+    type: string
+    required: false
+    default: '{"env":"test","owner":"oliver"}'
+
+  - id: vnet_name
+    name: Virtual Network Name
+    type: string
+    required: false
+    default: "vnet-japaneast-01"
+
+  - id: vnet_address_space
+    name: Virtual Network Address Space
+    type: string
+    required: false
+    default: "172.21.0.0/24"
+
+  - id: log_analytics_name
+    name: Log Analytics Workspace Name (optional)
+    type: string
+    required: false
+    default: ""
+
+  - id: log_analytics_sku
+    name: Log Analytics SKU
+    type: string
+    required: false
+    default: "PerGB2018"
+
+  - id: log_analytics_retention_in_days
+    name: Log Analytics Retention In Days
+    type: int
+    required: false
+    default: 30
+
+  - id: application_insights_name
+    name: Application Insights Name (optional)
+    type: string
+    required: false
+    default: ""
+
+  - id: application_insights_type
+    name: Application Insights Type
+    type: string
+    required: false
+    default: "web"
