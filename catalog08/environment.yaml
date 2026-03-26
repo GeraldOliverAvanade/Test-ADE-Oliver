@@ -50,7 +50,7 @@ parameters:
 
   - id: log_analytics_retention_in_days
     name: Log Analytics Retention In Days
-    type: int
+    type: integer
     required: false
     default: 30
 
