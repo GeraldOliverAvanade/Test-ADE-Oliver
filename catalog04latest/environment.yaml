@@ -21,8 +21,6 @@ parameters:
   - id: admin_password
     name: Admin Password
     type: string
-    required: true
-    default: "<your secure password>"
 
   - id: tags
     name: Tags (JSON string)
