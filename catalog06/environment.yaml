@@ -1,7 +1,7 @@
-name: ADEVmVnetNsgBastionStorageKvRsvPE
+name: ADEStorageKvLogRsv
 version: 1.0.0
-summary: Windows VM with VNet/Subnets, NSG, Bastion, Storage, Key Vault, Recovery Services Vault, and Private Endpoints
-description: Deploys a Resource Group, VNet, VM subnet, AzureBastionSubnet, Private Endpoint subnet, NSG, Windows VM, Bastion host, Storage Account with Blob Private Endpoint, Key Vault with Private Endpoint, Recovery Services Vault, optional VM backup, and Private DNS Zones.
+summary: Deploy Storage Account, Key Vault, Log Analytics, and Recovery Services Vault
+description: Deploys a Resource Group, Storage Account, Key Vault, Log Analytics Workspace, and Recovery Services Vault using Terraform.
 runner: "acrtfolivers.azurecr.io/ade-terraform-runner:1.0.0"
 templatePath: "azuredeploy.tf"
 
@@ -18,143 +18,11 @@ parameters:
     required: false
     default: "japaneast"
 
-  - id: admin_password
-    name: Admin Password
-    type: string
-    required: true
-    default: "<your secure password>"
-
   - id: tags
     name: Tags (JSON string)
     type: string
     required: false
     default: '{"env":"test","owner":"oliver"}'
-
-  - id: vnet_name
-    name: VNet Name
-    type: string
-    required: false
-    default: "vnet-test-oliver-01"
-
-  - id: vnet_address_space
-    name: VNet Address Space (comma-separated)
-    type: string
-    required: false
-    default: "172.21.0.0/24"
-
-  - id: vm_subnet_name
-    name: VM Subnet Name
-    type: string
-    required: false
-    default: "snet-vm-01"
-
-  - id: vm_subnet_prefixes
-    name: VM Subnet Prefixes (comma-separated)
-    type: string
-    required: false
-    default: "172.21.0.0/26"
-
-  - id: bastion_subnet_prefixes
-    name: Bastion Subnet Prefixes (comma-separated)
-    type: string
-    required: false
-    default: "172.21.0.64/26"
-
-  - id: private_endpoint_subnet_name
-    name: Private Endpoint Subnet Name
-    type: string
-    required: false
-    default: "snet-pe-01"
-
-  - id: private_endpoint_subnet_prefixes
-    name: Private Endpoint Subnet Prefixes (comma-separated)
-    type: string
-    required: false
-    default: "172.21.0.128/26"
-
-  - id: vm_name
-    name: VM Name
-    type: string
-    required: false
-    default: "vm-test-oliver-01"
-
-  - id: vm_size
-    name: VM Size (SKU)
-    type: string
-    required: false
-    default: "Standard_E2s_v3"
-
-  - id: admin_username
-    name: Admin Username
-    type: string
-    required: false
-    default: "adminuser"
-
-  - id: os_disk_size_gb
-    name: OS Disk Size (GB)
-    type: number
-    required: false
-    default: 127
-
-  - id: enable_vm_public_ip
-    name: Enable VM Public IP
-    type: boolean
-    required: false
-    default: false
-
-  - id: rdp_source_prefixes
-    name: RDP Allowed Source CIDRs (comma-separated, only if Public IP enabled)
-    type: string
-    required: false
-    default: ""
-
-  - id: image_publisher
-    name: Image Publisher
-    type: string
-    required: false
-    default: "MicrosoftWindowsServer"
-
-  - id: image_offer
-    name: Image Offer
-    type: string
-    required: false
-    default: "WindowsServer"
-
-  - id: image_sku
-    name: Image SKU
-    type: string
-    required: false
-    default: "2025-datacenter-azure-edition"
-
-  - id: image_version
-    name: Image Version
-    type: string
-    required: false
-    default: "latest"
-
-  - id: zone
-    name: Zone (e.g. "1", or empty)
-    type: string
-    required: false
-    default: "1"
-
-  - id: enable_auto_shutdown
-    name: Enable Auto Shutdown
-    type: boolean
-    required: false
-    default: true
-
-  - id: auto_shutdown_time_utc
-    name: Auto Shutdown Time (UTC, HHmm e.g. 1900)
-    type: string
-    required: false
-    default: "1900"
-
-  - id: bastion_sku
-    name: Bastion SKU (Basic/Standard)
-    type: string
-    required: false
-    default: "Standard"
 
   - id: enable_storage_account
     name: Enable Storage Account
@@ -180,12 +48,6 @@ parameters:
     required: false
     default: "LRS"
 
-  - id: enable_storage_private_endpoint
-    name: Enable Storage Blob Private Endpoint
-    type: boolean
-    required: false
-    default: true
-
   - id: enable_key_vault
     name: Enable Key Vault
     type: boolean
@@ -199,22 +61,10 @@ parameters:
     default: ""
 
   - id: key_vault_sku
-    name: Key Vault SKU (standard/premium)
+    name: Key Vault SKU
     type: string
     required: false
     default: "standard"
-
-  - id: key_vault_rbac_enabled
-    name: Key Vault RBAC Enabled
-    type: boolean
-    required: false
-    default: true
-
-  - id: enable_key_vault_private_endpoint
-    name: Enable Key Vault Private Endpoint
-    type: boolean
-    required: false
-    default: true
 
   - id: enable_recovery_services_vault
     name: Enable Recovery Services Vault
@@ -228,14 +78,8 @@ parameters:
     required: false
     default: ""
 
-  - id: enable_vm_backup
-    name: Enable VM Backup
-    type: boolean
+  - id: log_analytics_name
+    name: Log Analytics Workspace Name (optional)
+    type: string
     required: false
-    default: false
-
-  - id: enable_recovery_services_private_endpoint
-    name: Enable Recovery Services Vault Private Endpoint
-    type: boolean
-    required: false
-    default: false
+    default: ""
