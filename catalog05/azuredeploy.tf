@@ -35,13 +35,8 @@ variable "tags" {
 }
 
 #################
-# Storage
+# Storage Account
 #################
-variable "enable_storage_account" {
-  type    = bool
-  default = true
-}
-
 variable "storage_account_name" {
   type    = string
   default = ""
@@ -57,50 +52,37 @@ variable "storage_account_replication_type" {
   default = "LRS"
 }
 
+variable "storage_account_kind" {
+  type    = string
+  default = "StorageV2"
+}
+
+variable "enable_large_file_share" {
+  type    = bool
+  default = false
+}
+
 #################
-# Key Vault
+# File Share
 #################
-variable "enable_key_vault" {
+variable "enable_file_share" {
   type    = bool
   default = true
 }
 
-variable "key_vault_name" {
+variable "file_share_name" {
   type    = string
-  default = ""
+  default = "fileshare"
 }
 
-variable "key_vault_sku" {
-  type    = string
-  default = "standard"
-}
-
-#################
-# Recovery Services Vault
-#################
-variable "enable_recovery_services_vault" {
-  type    = bool
-  default = true
-}
-
-variable "recovery_services_vault_name" {
-  type    = string
-  default = ""
+variable "file_share_quota" {
+  type    = number
+  default = 100
 }
 
 #################
-# Log Analytics
+# Locals
 #################
-variable "log_analytics_name" {
-  type    = string
-  default = ""
-}
-
-#################
-# Data / Locals
-#################
-data "azurerm_client_config" "current" {}
-
 resource "random_string" "suffix" {
   length  = 8
   lower   = true
@@ -109,11 +91,7 @@ resource "random_string" "suffix" {
 
 locals {
   parsed_tags = try(jsondecode(var.tags), {})
-
   storage_account_name = var.storage_account_name != "" ? lower(var.storage_account_name) : "st${random_string.suffix.result}"
-  key_vault_name       = var.key_vault_name != "" ? lower(var.key_vault_name) : "kv${random_string.suffix.result}"
-  rsv_name             = var.recovery_services_vault_name != "" ? var.recovery_services_vault_name : "rsv-${random_string.suffix.result}"
-  log_name             = var.log_analytics_name != "" ? var.log_analytics_name : "log-${random_string.suffix.result}"
 }
 
 #################
@@ -129,79 +107,44 @@ resource "azurerm_resource_group" "rg" {
 # Storage Account
 #################
 resource "azurerm_storage_account" "sa" {
-  count                    = var.enable_storage_account ? 1 : 0
   name                     = local.storage_account_name
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
   account_tier             = var.storage_account_tier
   account_replication_type = var.storage_account_replication_type
+  account_kind             = var.storage_account_kind
 
-  min_tls_version = "TLS1_2"
-
-  tags = local.parsed_tags
-}
-
-#################
-# Key Vault
-#################
-resource "azurerm_key_vault" "kv" {
-  count               = var.enable_key_vault ? 1 : 0
-  name                = local.key_vault_name
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-
-  tenant_id = data.azurerm_client_config.current.tenant_id
-  sku_name  = var.key_vault_sku
-
-  enable_rbac_authorization = true
+  min_tls_version          = "TLS1_2"
+  large_file_share_enabled = var.enable_large_file_share
 
   tags = local.parsed_tags
 }
 
 #################
-# Recovery Services Vault
+# File Share
 #################
-resource "azurerm_recovery_services_vault" "rsv" {
-  count               = var.enable_recovery_services_vault ? 1 : 0
-  name                = local.rsv_name
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  sku                 = "Standard"
-
-  soft_delete_enabled = true
-
-  tags = local.parsed_tags
-}
-
-#################
-# Log Analytics
-#################
-resource "azurerm_log_analytics_workspace" "log" {
-  name                = local.log_name
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-
-  sku               = "PerGB2018"
-  retention_in_days = 30
-
-  tags = local.parsed_tags
+resource "azurerm_storage_share" "fileshare" {
+  count              = var.enable_file_share ? 1 : 0
+  name               = var.file_share_name
+  storage_account_id = azurerm_storage_account.sa.id
+  quota              = var.file_share_quota
 }
 
 #################
 # Outputs
 #################
 output "storage_account_name" {
-  value = var.enable_storage_account ? azurerm_storage_account.sa[0].name : null
+  value = azurerm_storage_account.sa.name
 }
 
-output "key_vault_id" {
-  value = var.enable_key_vault ? azurerm_key_vault.kv[0].id : null
+output "storage_account_id" {
+  value = azurerm_storage_account.sa.id
 }
 
-output "recovery_services_vault_id" {
-  value = var.enable_recovery_services_vault ? azurerm_recovery_services_vault.rsv[0].id : null
+output "primary_file_endpoint" {
+  value = azurerm_storage_account.sa.primary_file_endpoint
 }
 
-output "log_analytics_workspace_id" {
-  value = azurerm_log_analytics_workspace.log.id
+output "file_share_name" {
+  value = var.enable_file_share ? azurerm_storage_share.fileshare[0].name : null
 }
