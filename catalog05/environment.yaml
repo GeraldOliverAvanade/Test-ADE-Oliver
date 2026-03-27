@@ -1,3 +1,35 @@
+name: ADEStorageFileShare
+version: 1.0.0
+summary: Deploy Storage Account with Azure File Share
+description: Deploys a Resource Group, Storage Account, and optional Azure File Share using Terraform.
+runner: "acrtfolivers.azurecr.io/ade-terraform-runner:1.0.0"
+templatePath: "azuredeploy.tf"
+
+parameters:
+  - id: resource_group_name
+    name: Resource Group Name
+    type: string
+    required: false
+    default: "rgtesttfoliver"
+
+  - id: location
+    name: Location
+    type: string
+    required: false
+    default: "japaneast"
+
+  - id: tags
+    name: Tags (JSON string)
+    type: string
+    required: false
+    default: '{"env":"test","owner":"oliver"}'
+
+  - id: storage_account_name
+    name: Storage Account Name (optional)
+    type: string
+    required: false
+    default: ""
+
   - id: storage_account_tier
     name: Storage Account Tier
     type: string
@@ -15,3 +47,27 @@
     type: string
     required: false
     default: "StorageV2"
+
+  - id: enable_large_file_share
+    name: Enable Large File Share
+    type: boolean
+    required: false
+    default: false
+
+  - id: enable_file_share
+    name: Enable File Share
+    type: boolean
+    required: false
+    default: true
+
+  - id: file_share_name
+    name: File Share Name
+    type: string
+    required: false
+    default: "fileshare"
+
+  - id: file_share_quota
+    name: File Share Quota (GB)
+    type: integer
+    required: false
+    default: 100
