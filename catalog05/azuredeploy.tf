@@ -86,12 +86,17 @@ variable "file_share_quota" {
 resource "random_string" "suffix" {
   length  = 8
   lower   = true
+  upper   = false   # 🔥 MUST ADD THIS
+  numeric = true
   special = false
 }
 
 locals {
   parsed_tags = try(jsondecode(var.tags), {})
-  storage_account_name = var.storage_account_name != "" ? lower(var.storage_account_name) : "st${random_string.suffix.result}"
+
+  storage_account_name = var.storage_account_name != "" 
+    ? lower(var.storage_account_name) 
+    : lower("st${random_string.suffix.result}")
 }
 
 #################
