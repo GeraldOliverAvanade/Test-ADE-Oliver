@@ -1,0 +1,85 @@
+name: ADEStorageKvLogRsv
+version: 1.0.0
+summary: Deploy Storage Account, Key Vault, Log Analytics, and Recovery Services Vault
+description: Deploys a Resource Group, Storage Account, Key Vault, Log Analytics Workspace, and Recovery Services Vault using Terraform.
+runner: "acrtfolivers.azurecr.io/ade-terraform-runner:1.0.0"
+templatePath: "azuredeploy.tf"
+
+parameters:
+  - id: resource_group_name
+    name: Resource Group Name
+    type: string
+    required: false
+    default: "rgtesttfoliver"
+
+  - id: location
+    name: Location
+    type: string
+    required: false
+    default: "japaneast"
+
+  - id: tags
+    name: Tags (JSON string)
+    type: string
+    required: false
+    default: '{"env":"test","owner":"oliver"}'
+
+  - id: enable_storage_account
+    name: Enable Storage Account
+    type: boolean
+    required: false
+    default: true
+
+  - id: storage_account_name
+    name: Storage Account Name (optional)
+    type: string
+    required: false
+    default: ""
+
+  - id: storage_account_tier
+    name: Storage Account Tier
+    type: string
+    required: false
+    default: "Standard"
+
+  - id: storage_account_replication_type
+    name: Storage Account Replication Type
+    type: string
+    required: false
+    default: "LRS"
+
+  - id: enable_key_vault
+    name: Enable Key Vault
+    type: boolean
+    required: false
+    default: true
+
+  - id: key_vault_name
+    name: Key Vault Name (optional)
+    type: string
+    required: false
+    default: ""
+
+  - id: key_vault_sku
+    name: Key Vault SKU
+    type: string
+    required: false
+    default: "standard"
+
+  - id: enable_recovery_services_vault
+    name: Enable Recovery Services Vault
+    type: boolean
+    required: false
+    default: true
+
+  - id: recovery_services_vault_name
+    name: Recovery Services Vault Name (optional)
+    type: string
+    required: false
+    default: ""
+
+  - id: log_analytics_name
+    name: Log Analytics Workspace Name (optional)
+    type: string
+    required: false
+    default: ""
