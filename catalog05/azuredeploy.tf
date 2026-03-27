@@ -40,21 +40,51 @@ variable "tags" {
 variable "storage_account_name" {
   type    = string
   default = ""
+
+  validation {
+    condition = (
+      var.storage_account_name == "" ||
+      can(regex("^[a-z0-9]{3,24}$", lower(var.storage_account_name)))
+    )
+    error_message = "storage_account_name must be empty or 3-24 characters of lowercase letters and numbers only."
+  }
 }
 
 variable "storage_account_tier" {
   type    = string
   default = "Standard"
+
+  validation {
+    condition     = contains(["Standard", "Premium"], var.storage_account_tier)
+    error_message = "storage_account_tier must be Standard or Premium."
+  }
 }
 
 variable "storage_account_replication_type" {
   type    = string
   default = "LRS"
+
+  validation {
+    condition = contains([
+      "LRS",
+      "GRS",
+      "RAGRS",
+      "ZRS",
+      "GZRS",
+      "RAGZRS"
+    ], var.storage_account_replication_type)
+    error_message = "storage_account_replication_type must be one of LRS, GRS, RAGRS, ZRS, GZRS, or RAGZRS."
+  }
 }
 
 variable "storage_account_kind" {
   type    = string
   default = "StorageV2"
+
+  validation {
+    condition     = contains(["StorageV2", "FileStorage"], var.storage_account_kind)
+    error_message = "storage_account_kind must be StorageV2 or FileStorage."
+  }
 }
 
 variable "enable_large_file_share" {
@@ -73,30 +103,41 @@ variable "enable_file_share" {
 variable "file_share_name" {
   type    = string
   default = "fileshare"
+
+  validation {
+    condition     = can(regex("^[a-z0-9-]{3,63}$", var.file_share_name))
+    error_message = "file_share_name must be 3-63 characters and contain only lowercase letters, numbers, and hyphens."
+  }
 }
 
 variable "file_share_quota" {
   type    = number
   default = 100
+
+  validation {
+    condition     = var.file_share_quota >= 1 && var.file_share_quota <= 102400
+    error_message = "file_share_quota must be between 1 and 102400 GB."
+  }
+}
+
+#################
+# Random suffix
+#################
+resource "random_string" "suffix" {
+  length  = 8
+  lower   = true
+  upper   = false
+  numeric = true
+  special = false
 }
 
 #################
 # Locals
 #################
-resource "random_string" "suffix" {
-  length  = 8
-  lower   = true
-  upper   = false   # 🔥 MUST ADD THIS
-  numeric = true
-  special = false
-}
-
 locals {
-  parsed_tags = try(jsondecode(var.tags), {})
-
-  storage_account_name = var.storage_account_name != "" 
-    ? lower(var.storage_account_name) 
-    : lower("st${random_string.suffix.result}")
+  parsed_tags          = try(jsondecode(var.tags), {})
+  generated_sa_name    = "st${random_string.suffix.result}"
+  storage_account_name = var.storage_account_name != "" ? lower(var.storage_account_name) : local.generated_sa_name
 }
 
 #################
