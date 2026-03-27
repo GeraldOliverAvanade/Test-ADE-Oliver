@@ -68,6 +68,6 @@ parameters:
 
   - id: file_share_quota
     name: File Share Quota (GB)
-    type: int
+    type: integer
     required: false
     default: 100
